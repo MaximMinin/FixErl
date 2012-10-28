@@ -5,3 +5,5 @@ priv
 *.beam
 rebar
 *.plt
+.project
+.settings/*
