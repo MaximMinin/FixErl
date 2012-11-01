@@ -13,18 +13,18 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/2, newMessage/2, getMessages/3]).
+-export([start_link/4, newMessage/2, getMessages/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {clients = [], pid, fixSender, count = 0}).
+-record(state, {clients = [], pid, fixSender, count = 0, senderCompID, targetCompID}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Pid, FixSender) ->
-    gen_server:start_link(?MODULE, [Pid, FixSender], []).
+start_link(Pid, FixSender, SenderCompID, TargetCompID) ->
+    gen_server:start_link(?MODULE, [Pid, FixSender, SenderCompID, TargetCompID], []).
 
 newMessage(Pid, Message)->
     gen_server:cast(Pid, {message, Message}).
@@ -43,8 +43,9 @@ getMessages(Pid, From, To) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Pid, FixSender]) ->
-    State = #state{pid = Pid, fixSender = FixSender},
+init([Pid, FixSender, SenderCompID, TargetCompID]) ->
+    State = #state{pid = Pid, fixSender = FixSender, 
+                   senderCompID = SenderCompID, targetCompID = TargetCompID},
     {ok, State}.
 
 %% --------------------------------------------------------------------
@@ -75,12 +76,13 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender, count = C} 
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon -> Pid ! fix_starting;
-        testRequest -> tcp_writer:send(FixSender, ""); 
-        heartbeat -> io:format("HEARTBEAT: ~p~n", [Msg]);
-        logout -> io:format("LOGOUT: ~p~n", [Msg]), erlang:exit(fix_session_close);
+        testRequest -> fix_gateway:send(FixSender, ""); 
+        heartbeat -> lager:debug("HEARTBEAT: ~p~n", [Msg]);
+        logout -> lager:debug("LOGOUT: ~p~n", [Msg]), 
+                  erlang:exit(fix_session_close);
         resendRequest -> lists:map(fun(Num) -> 
                                            [{fix_out_messages, Num, ResendMessage}] = mnesia:dirty_read(({fix_out_messages, Num})),
-                                           tcp_writer:resend(FixSender, ResendMessage)
+                                           fix_gateway:resend(FixSender, ResendMessage)
                                    end, 
                                    fix_utils:get_messagesnumbers_toresend(Msg))
     end,
@@ -101,8 +103,7 @@ handle_info(_Info, State) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-terminate(Reason, _State) ->
-    io:format("REASON: ~p~n", [Reason]),
+terminate(_Reason, _State) ->
     ok.
 
 %% --------------------------------------------------------------------

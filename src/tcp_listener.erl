@@ -56,13 +56,13 @@ init({Port, ConcurrentAcceptorCount, AcceptorSup}) ->
                           end,
                           lists:duplicate(ConcurrentAcceptorCount, dummy)),
             {ok, {LIPAddress, LPort}} = inet:sockname(LSock),
-            error_logger:info_msg("started TCP listener on ~s:~p~n",
+            lager:error("started TCP listener on ~s:~p~n",
                                   [inet_parse:ntoa(LIPAddress), LPort]),
             {ok, #state{
                         sock=LSock
                        }};
         {error, Reason} ->
-           io:format(
+           lager:error(
               "failed to start TCP listener on: ~p - ~p~n",
               [Port, Reason]),
             {stop, {cannot_listen, Port, Reason}}
@@ -109,7 +109,7 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{sock=LSock, on_shutdown = {M,F,A}}) ->
     {ok, {IPAddress, Port}} = inet:sockname(LSock),
     gen_tcp:close(LSock),
-    io:format("stopped TCP listener on ~s:~p~n",
+    lager:error("stopped TCP listener on ~s:~p~n",
                           [inet_parse:ntoa(IPAddress), Port]),
     apply(M, F, A ++ [IPAddress, Port]).
 

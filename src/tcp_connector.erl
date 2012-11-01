@@ -10,17 +10,16 @@
 %%
 %% Exported Functions
 %%
--export([start_link/3, init/5]).
+-export([start_link/5, init/7]).
 
 %%
 %% API Functions
 %%
--define(RECONNECT_TIMEOUT, 80).
 
-start_link(Host, Port, AcceptorSup) ->
-    {ok, proc_lib:spawn_link(?MODULE, init, [self(), Host, Port, AcceptorSup, 0])}.
+start_link(Host, Port, AcceptorSup, MaxReconnect, ReconnectTimeout) ->
+    {ok, proc_lib:spawn_link(?MODULE, init, [self(), Host, Port, AcceptorSup, 0, MaxReconnect, ReconnectTimeout])}.
 
-init(Parent, Host, Port, AcceptorSup, C) ->
+init(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout) ->
     State = gen_tcp:connect(Host, Port, 
                          [
                          binary,
@@ -29,34 +28,33 @@ init(Parent, Host, Port, AcceptorSup, C) ->
                          {exit_on_close, false},
                          {active, false}]
                                                        ),
-    io:format("State: ~p~n", [State]),
     case State of
         {ok, Socket} ->
             {ok, APid} = supervisor:start_child(tcp_client_sup, [Socket]),
             erlang:monitor(process, APid),
-            main_loop(Parent, Host, Port, AcceptorSup, 0);
+            main_loop(Parent, Host, Port, AcceptorSup, 0, MaxReconnect, ReconnectTimeout);
         Error ->
-            io:format("Error: ~p~n", [Error]),
-            erlang:send_after(?RECONNECT_TIMEOUT, self(), reconnect),
-            main_loop(Parent, Host, Port, AcceptorSup, C)
+            lager:error("~p - ERROR: ~p~n", [?MODULE, Error]),
+            erlang:send_after(ReconnectTimeout*1000, self(), reconnect),
+            main_loop(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout)
     end.
 
 %%
 %% Local Functions
 %%
-main_loop(_Parent, _Host, _Port, _AcceptorSup, C) when C > 8 ->
-    exit(max_recconect);
-main_loop(Parent, Host, Port, AcceptorSup, C) ->
+main_loop(_Parent, _Host, _Port, _AcceptorSup, C, MaxReconnect, _ReconnectTimeout) when C > MaxReconnect ->
+    exit(max_reconnect);
+main_loop(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout) ->
     receive
         reconnect ->
-            init(Parent, Host, Port, AcceptorSup, C+1);
+            init(Parent, Host, Port, AcceptorSup, C+1, MaxReconnect, ReconnectTimeout);
         {'DOWN', Ref, Type, Object, Info} ->
-            io:format("DOWN: ~p ~p ~p ~p~n", [Ref, Type, Object, Info]),
+            lager:debug("DOWN: ~p ~p ~p ~p~n", [Ref, Type, Object, Info]),
             exit(close_socket);
         stop ->
             ok;
         Other ->
-            io:format("REASON FOR SOCKET EXIT: ~p~n", [Other]),
+            lager:error("REASON FOR SOCKET EXIT: ~p~n", [Other]),
             %% internal error - something worth dying for
             exit({unexpected_message, Other})
     end.

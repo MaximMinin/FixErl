@@ -65,8 +65,9 @@ handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid, fix_version 
     {Broken, Messages} = split(binary:list_to_bin([Last, Data])),
     lists:map(fun(M) ->  
       try Rec = convertor:convertFixToRecord(M, FixVersion),
-          fix_worker:newMessage(ClientPid, Rec)
-     catch error:Error -> io:format("ERROR: ~p~n", [Error])
+          fix_worker:newMessage(ClientPid, Rec),
+          lager:info("FIX OUT MESSAGE: ~s~n", convertor:format(Rec, FixVersion))
+     catch error:Error -> lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
      end
      end, Messages),
     {noreply, State#state{last = Broken}}.

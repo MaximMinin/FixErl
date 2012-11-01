@@ -18,6 +18,7 @@
 %%
 
 init() ->
+    mnesia:start(),
     ok = ensure_mnesia_running(),
     ok = ensure_mnesia_dir(),
     create_tables(),
@@ -34,21 +35,21 @@ table_definitions() ->
     {last_startup_run, 
                     [
                         {type, set},
-                        {disc_only_copies, node()},
+                        {disc_copies, [node()]},
                         {attributes, record_info(fields, last_startup_run)}
                     ]
     },
     {fix_in_messages, 
                     [
                         {type, set},
-                        {disc_only_copies, node()},
+                        {disc_copies, [node()]},
                         {attributes, record_info(fields, fix_in_messages)}
                     ]
     },
     {fix_out_messages,  
                     [
                         {type, set},
-                        {disc_copies, node()},
+                        {disc_copies, [node()]},
                         {attributes, record_info(fields, fix_out_messages)}
                     ]
     }

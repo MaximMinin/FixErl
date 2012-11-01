@@ -10,7 +10,7 @@
 %%
 %% Exported Functions
 %%
--export([get_logon/2, get_heartbeat/2, get_heartbeat_on_testrequest/1,
+-export([get_logon/2, get_heartbeat/2, get_heartbeat_on_testRequest/1,
          get_messagesnumbers_toresend/1,
          getNow/0, getNow/1, getUniq/0
          ]).
@@ -42,7 +42,7 @@ get_heartbeat(SenderCompID, TargetCompID)->
                 standardTrailer = #standardTrailer{}
                }.
 
-get_heartbeat_on_testrequest(#testRequest{standardHeader = #standardHeader{
+get_heartbeat_on_testRequest(#testRequest{standardHeader = #standardHeader{
                                                                            targetCompID = TargetCompID,
                                                                            senderCompID = SenderCompID
                                                                            },

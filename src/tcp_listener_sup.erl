@@ -15,7 +15,7 @@
 %% --------------------------------------------------------------------
 %% External exports
 %% --------------------------------------------------------------------
--export([start_link/1, start_link/2]).
+-export([start_link/5]).
 
 %% --------------------------------------------------------------------
 %% Internal exports
@@ -29,13 +29,12 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Port) ->
-    supervisor:start_link({local, ?MODULE},
-      ?MODULE, {Port}).
-
-start_link(Host, Port) ->
-    supervisor:start_link({local, ?MODULE},
-      ?MODULE, {Host, Port}).
+start_link(Id, undefined, Port, undefined, undefined) ->
+    supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_", ?MODULE]))},
+      ?MODULE, { Port});
+start_link(Id, Host, Port, MaxReconnect, ReconnectTimeout) ->
+    supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_", ?MODULE]))},
+      ?MODULE, {Host, Port, MaxReconnect, ReconnectTimeout}).
 
 %% ====================================================================
 %% Server functions
@@ -55,15 +54,14 @@ init({Port}) ->
            {tcp_listener, {tcp_listener, start_link,
                            [Port, 1, Name]},
             transient, 100, worker, [tcp_listener]}]}};
-init({Host, Port}) ->
+init({Host, Port, MaxReconnect, ReconnectTimeout}) ->
     Name = tcp_name(tcp_acceptor_sup, Host, Port),
-    io:format("ACCEPTOR: ~p~n", [Name]),
     {ok, {{one_for_all, 10, 10},
           [{tcp_acceptor_sup, {tcp_acceptor_sup, start_link,
                                [Name]},
             transient, infinity, supervisor, [tcp_acceptor_sup]},
            {tcp_connector, {tcp_connector, start_link,
-                           [Host, Port, Name]},
+                           [Host, Port, Name, MaxReconnect, ReconnectTimeout]},
             transient, infinity, worker, [tcp_connector]}
           ]
          }

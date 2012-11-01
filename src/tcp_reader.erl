@@ -6,11 +6,13 @@
 %%% -------------------------------------------------------------------
 -module(tcp_reader).
 
--export([start_link/0, start_link/1, info/1, info/2]).
+-include("fixerl.hrl").
+
+-export([start_link/2, start_link/1, info/1, info/2]).
 
 -export([system_continue/3, system_terminate/4, system_code_change/4]).
 
--export([init/1, init/2, mainloop/3]).
+-export([init/3, init/2, mainloop/3]).
 
 
 -import(gen_tcp).
@@ -24,7 +26,7 @@
 -define(FRAME_MIN_SIZE, 1).
 -define(HEARTBEAT_TIMEOUT, 30).
 
--record(state, {sock, connection, callback, recv_ref, connection_state, worker, writer}).
+-record(state, {sock, connection, callback, recv_ref, connection_state, worker, writer, session_par}).
 
 -record(connection, {timeout_sec, frame_max}).
 
@@ -34,20 +36,20 @@
          state, timeout, frame_max]).
 
 
-start_link() ->
-    {ok, proc_lib:spawn_link(?MODULE, init, [self()])}.
-start_link(Sock) ->
-    {ok, proc_lib:spawn_link(?MODULE, init, [self(), Sock])}.
+start_link(Session) ->
+    {ok, proc_lib:spawn_link(?MODULE, init, [self(),Session])}.
+start_link(Sock, Session) ->
+    {ok, proc_lib:spawn_link(?MODULE, init, [self(), Sock, Session])}.
 
-init(Parent) ->
+init(Parent,Session) ->
     Deb = sys:debug_options([]),
     receive
-        {go, Sock} -> start_connection(Parent, Deb, Sock)
+        {go, Sock} -> start_connection(Parent, Deb, Sock, Session)
     end.
 
-init(Parent, Sock) ->
+init(Parent, Sock, Session) ->
     Deb = sys:debug_options([]),
-    start_connection(Parent, Deb, Sock).
+    start_connection(Parent, Deb, Sock, Session).
 
 system_continue(Parent, Deb, State) ->
     ?MODULE:mainloop(Parent, Deb, State).
@@ -88,7 +90,7 @@ peername(Sock) ->
               exit(normal)
     end.
 
-start_connection(Parent, Deb, ClientSock) ->
+start_connection(Parent, Deb, ClientSock, Session) ->
     process_flag(trap_exit, true),
     {PeerAddressS, PeerPort} = peername(ClientSock),
     try 
@@ -96,14 +98,21 @@ start_connection(Parent, Deb, ClientSock) ->
                         [self(), PeerAddressS, PeerPort]),
         erlang:send_after(?HANDSHAKE_TIMEOUT * 1000, self(),
                           handshake_timeout),
-        {ok, WriterPid} = tcp_writer:start_link(ClientSock),
-        tcp_writer:send(WriterPid, fix_utils:get_logon()),%%TODO
+        {ok, WriterPid} = fix_gateway:start_link(ClientSock, 
+                                                 Session#session_parameter.fix_version, 
+                                                 Session#session_parameter.senderCompId, 
+                                                 Session#session_parameter.targetCompId
+                                                ), 
+        fix_gateway:send(WriterPid, fix_utils:get_logon(Session#session_parameter.senderCompId,
+                                                        Session#session_parameter.targetCompId)),
         mainloop(Parent, Deb, switch_callback(
-                                #state{sock = ClientSock,
-                                    writer = WriterPid,
-                                    connection = #connection{
-                                    timeout_sec = ?HANDSHAKE_TIMEOUT,
-                                    frame_max = ?FRAME_MIN_SIZE
+                                #state{
+                                       session_par = Session,
+                                       sock = ClientSock,
+                                       writer = WriterPid,
+                                       connection = #connection{
+                                       timeout_sec = ?HANDSHAKE_TIMEOUT,
+                                       frame_max = ?FRAME_MIN_SIZE
                                     },
                                     callback = uninitialized_callback,
                                     recv_ref = none,
@@ -191,12 +200,14 @@ switch_callback(OldState, NewCallback, Length) ->
                 recv_ref = Ref}.
 
 handle_input_fix(handshake, Data,
-             State = #state{sock = Sock, connection = Connection, writer = WriterPid}) ->
+             State = #state{session_par = Session, sock = Sock, connection = Connection, writer = WriterPid}) ->
     io:format("TCP: ~p~n", [Data]),
-    {ok, FixPid} = fix_worker:start_link(self(), WriterPid),
-    {ok, Splitter} = fix_splitter:start_link(FixPid),
+    {ok, FixPid} = fix_worker:start_link(self(), WriterPid, 
+                                         Session#session_parameter.senderCompId, 
+                                         Session#session_parameter.targetCompId),
+    {ok, Splitter} = fix_splitter:start_link(FixPid, Session#session_parameter.fix_version), 
     fix_splitter:newRowData(Splitter, Data),
-    fix_heartbeat:start_heartbeat(Sock, WriterPid, ?HEARTBEAT_TIMEOUT),
+    fix_heartbeat:start_heartbeat(Sock, WriterPid, Session#session_parameter.heartbeatInterval),
     {State#state{worker = Splitter,
               connection = Connection#connection{timeout_sec = ?NORMAL_TIMEOUT},
               connection_state = running},

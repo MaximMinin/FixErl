@@ -14,7 +14,7 @@
 %% --------------------------------------------------------------------
 %% External exports
 %% --------------------------------------------------------------------
--export([start_link/0, start_child/1]).
+-export([start_link/0, start_session/1]).
 
 %% --------------------------------------------------------------------
 %% Internal exports
@@ -39,7 +39,7 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-start_child(#session_parameter{}=S) ->
+start_session(#session_parameter{}=S) ->
     supervisor:start_child(?MODULE, S).
 %% ====================================================================
 %% Server functions
@@ -51,8 +51,8 @@ start_child(#session_parameter{}=S) ->
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 init([]) ->
-    AChild = {fixerl_sup, {fixerl_sup, start_link,[]},
-	      permanent,2000,supervisor,[fixerl_sup]},
+    AChild = {fix_session_sup, {fix_session_sup, start_link,[]},
+	      permanent,2000,supervisor,[fix_session_sup]},
     {ok,{{simple_one_for_one,0,1}, [AChild]}}.
 
 %% ====================================================================

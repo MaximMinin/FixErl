@@ -4,7 +4,7 @@
 %%%
 %%% Created : 28.06.2012
 %%% -------------------------------------------------------------------
--module(fixerl_sup).
+-module(fix_session_sup).
 
 -behaviour(supervisor).
 
@@ -22,17 +22,23 @@
 %% API functions
 %% ===================================================================
 
-start_link(#session_parameter{host=Host, port= Port}) ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, [Host, Port]).
+start_link(#session_parameter{id = Id} = S) ->
+    supervisor:start_link({local, Id}, ?MODULE, [S]).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
-init([Host, Port]) ->
-    AChild = {tcp_listener_sup,{tcp_listener_sup, start_link,[Host, Port]},
+init([S]) ->
+    AChild = {tcp_listener_sup,{tcp_listener_sup, start_link,[ 
+                                                               S#session_parameter.id, 
+                                                               S#session_parameter.host, 
+                                                               S#session_parameter.port,
+                                                               S#session_parameter.max_reconnect,
+                                                               S#session_parameter.reconnect_interval
+                                                             ]},
           permanent,2000,supervisor,[tcp_listener_sup]},
-    BChild = {tcp_client_sup,{tcp_client_sup, start_link,[]},
+    BChild = {tcp_client_sup,{tcp_client_sup, start_link,[S]},
           permanent,2000,supervisor,[tcp_client_sup]},
     {ok,{{one_for_all,0,1}, [AChild, BChild]}}.
 

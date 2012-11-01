@@ -25,7 +25,7 @@ start_heartbeat(Sock, Pid, TimeoutSec) ->
     spawn_link(fun () -> heartbeater(Sock, TimeoutSec * 1000 div 2,
                                      send_oct, 0,
                                      fun () ->
-                                             catch tcp_writer:send(Pid, fix_utils:get_heartbeat()),
+                                             catch fix_gateway:send_heartbeat(Pid),
                                              continue
                                      end,
                                      erlang:monitor(process, Parent)) end),
