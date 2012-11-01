@@ -31,10 +31,10 @@
 %% ====================================================================
 start_link(Id, undefined, Port, undefined, undefined) ->
     supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_", ?MODULE]))},
-      ?MODULE, { Port});
+      ?MODULE, {Port, Id});
 start_link(Id, Host, Port, MaxReconnect, ReconnectTimeout) ->
     supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_", ?MODULE]))},
-      ?MODULE, {Host, Port, MaxReconnect, ReconnectTimeout}).
+      ?MODULE, {Host, Port, MaxReconnect, ReconnectTimeout, Id}).
 
 %% ====================================================================
 %% Server functions
@@ -45,7 +45,7 @@ start_link(Id, Host, Port, MaxReconnect, ReconnectTimeout) ->
 %%          ignore                          |
 %%          {error, Reason}
 %% --------------------------------------------------------------------
-init({Port}) ->
+init({Port, Id}) ->
     Name = tcp_name(tcp_acceptor_sup, Port),
     {ok, {{one_for_all, 10, 10},
           [{tcp_acceptor_sup, {tcp_acceptor_sup, start_link,
@@ -54,14 +54,14 @@ init({Port}) ->
            {tcp_listener, {tcp_listener, start_link,
                            [Port, 1, Name]},
             transient, 100, worker, [tcp_listener]}]}};
-init({Host, Port, MaxReconnect, ReconnectTimeout}) ->
+init({Host, Port, MaxReconnect, ReconnectTimeout, Id}) ->
     Name = tcp_name(tcp_acceptor_sup, Host, Port),
     {ok, {{one_for_all, 10, 10},
           [{tcp_acceptor_sup, {tcp_acceptor_sup, start_link,
                                [Name]},
             transient, infinity, supervisor, [tcp_acceptor_sup]},
            {tcp_connector, {tcp_connector, start_link,
-                           [Host, Port, Name, MaxReconnect, ReconnectTimeout]},
+                           [Host, Port, erlang:list_to_atom(lists:concat([Id, "_", tcp_client_sup])), MaxReconnect, ReconnectTimeout]},
             transient, infinity, worker, [tcp_connector]}
           ]
          }

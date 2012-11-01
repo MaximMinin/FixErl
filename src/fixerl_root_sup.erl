@@ -40,7 +40,7 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 start_session(#session_parameter{}=S) ->
-    supervisor:start_child(?MODULE, S).
+    supervisor:start_child(?MODULE, [S]).
 %% ====================================================================
 %% Server functions
 %% ====================================================================

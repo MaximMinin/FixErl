@@ -35,10 +35,10 @@
          recv_oct, recv_cnt, send_oct, send_cnt, send_pend,
          state, timeout, frame_max]).
 
-
 start_link(Session) ->
     {ok, proc_lib:spawn_link(?MODULE, init, [self(),Session])}.
-start_link(Sock, Session) ->
+
+start_link(Session, Sock) ->
     {ok, proc_lib:spawn_link(?MODULE, init, [self(), Sock, Session])}.
 
 init(Parent,Session) ->

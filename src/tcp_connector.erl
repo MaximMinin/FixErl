@@ -30,7 +30,7 @@ init(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout) ->
                                                        ),
     case State of
         {ok, Socket} ->
-            {ok, APid} = supervisor:start_child(tcp_client_sup, [Socket]),
+            {ok, APid} = tcp_client_sup:start_child(AcceptorSup, Socket),
             erlang:monitor(process, APid),
             main_loop(Parent, Host, Port, AcceptorSup, 0, MaxReconnect, ReconnectTimeout);
         Error ->
