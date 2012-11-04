@@ -15,7 +15,7 @@
 %% --------------------------------------------------------------------
 %% External exports
 %% --------------------------------------------------------------------
--export([start_link/1]).
+-export([start_link/2, start_link/1]).
 
 %% --------------------------------------------------------------------
 %% Internal exports
@@ -31,6 +31,8 @@
 %% ====================================================================
 start_link(Name) ->
     supervisor:start_link({local, Name}, ?MODULE, []).
+start_link(Name, Id) ->
+    supervisor:start_link({local, Name}, ?MODULE, [Id]).
 
 %% ====================================================================
 %% Server functions
@@ -44,4 +46,8 @@ start_link(Name) ->
 init([]) ->
     {ok, {{simple_one_for_one, 10, 10},
           [{tcp_acceptor, {tcp_acceptor, start_link, []},
+            transient, brutal_kill, worker, [tcp_acceptor]}]}};
+init([Id]) ->
+    {ok, {{simple_one_for_one, 10, 10},
+          [{tcp_acceptor, {tcp_acceptor, start_link, [Id]},
             transient, brutal_kill, worker, [tcp_acceptor]}]}}.

@@ -14,19 +14,19 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/1]).
+-export([start_link/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {sock, ref}).
+-record(state, {sock, ref, id}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(LSock) ->
-    gen_server:start_link(?MODULE, {LSock}, []).
+start_link(Id, LSock) ->
+    gen_server:start_link(?MODULE, {Id, LSock}, []).
 
 %% ====================================================================
 %% Server functions
@@ -40,9 +40,9 @@ start_link(LSock) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init({LSock}) ->
+init({Id, LSock}) ->
     case prim_inet:async_accept(LSock, -1) of
-        {ok, Ref} -> {ok, #state{sock=LSock, ref=Ref}};
+        {ok, Ref} -> {ok, #state{sock=LSock, ref=Ref, id =Id}};
         Error -> {stop, {cannot_accept, Error}}
     end.
 
@@ -77,7 +77,7 @@ handle_cast(_Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_info({inet_async, LSock, Ref, {ok, Sock}},
-            State = #state{sock=LSock, ref=Ref}) ->
+            State = #state{sock=LSock, ref=Ref, id= Id}) ->
     {ok, Mod} = inet_db:lookup_socket(LSock),
     inet_db:register_socket(Sock, Mod),
     {ok, {Address, Port}} = inet:sockname(LSock),
@@ -85,7 +85,7 @@ handle_info({inet_async, LSock, Ref, {ok, Sock}},
     lager:info("accepted TCP connection on ~s:~p from ~s:~p~n",
                           [inet_parse:ntoa(Address), Port,
                            inet_parse:ntoa(PeerAddress), PeerPort]),
-    {ok, Child} = supervisor:start_child(tcp_client_sup, []),
+    {ok, Child} = tcp_client_sup:start_child(Id, []),
     ok = gen_tcp:controlling_process(Sock, Child),
     Child ! {go, Sock},
     case prim_inet:async_accept(LSock, -1) of

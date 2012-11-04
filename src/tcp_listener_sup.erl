@@ -49,7 +49,7 @@ init({Port, Id}) ->
     Name = tcp_name(tcp_acceptor_sup, Port),
     {ok, {{one_for_all, 10, 10},
           [{tcp_acceptor_sup, {tcp_acceptor_sup, start_link,
-                               [Name]},
+                               [Name, erlang:list_to_atom(lists:concat([Id, "_", tcp_client_sup]))]},
             transient, infinity, supervisor, [tcp_acceptor_sup]},
            {tcp_listener, {tcp_listener, start_link,
                            [Port, 1, Name]},

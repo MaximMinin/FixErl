@@ -33,6 +33,7 @@ start_link(Session) ->
     supervisor:start_link({local, erlang:list_to_atom(lists:concat([Session#session_parameter.id, "_", ?MODULE]))}, ?MODULE, [Session]).
 
 start_child(Id, Arg) ->
+    lager:info("STARTE TCP READER PID: ~p ", [erlang:whereis(Id)]),
     lager:info("STARTE TCP READER: ~p ~p", [Id, Arg]),
     supervisor:start_child(Id, [Arg]).
 %% ====================================================================

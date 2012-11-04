@@ -36,15 +36,22 @@
          state, timeout, frame_max]).
 
 start_link(Session) ->
+    lager:info("START_LINK READER ~p~n", [Session]),
     {ok, proc_lib:spawn_link(?MODULE, init, [self(),Session])}.
 
+start_link(Session, []) ->
+    lager:info("START_LINK READER ~p~n", [Session]),
+    {ok, proc_lib:spawn_link(?MODULE, init, [self(),Session])};
 start_link(Session, Sock) ->
+    lager:info("START_LINK READER ~p~p~n", [Session, Sock]),
     {ok, proc_lib:spawn_link(?MODULE, init, [self(), Sock, Session])}.
 
 init(Parent,Session) ->
     Deb = sys:debug_options([]),
     receive
-        {go, Sock} -> start_connection(Parent, Deb, Sock, Session)
+        {go, Sock} -> 
+                     lager:info("START READER ~p", [Session]),
+                     start_connection(Parent, Deb, Sock, Session)
     end.
 
 init(Parent, Sock, Session) ->
@@ -204,7 +211,8 @@ handle_input_fix(handshake, Data,
     io:format("TCP: ~p~n", [Data]),
     {ok, FixPid} = fix_worker:start_link(self(), WriterPid, 
                                          Session#session_parameter.senderCompId, 
-                                         Session#session_parameter.targetCompId),
+                                         Session#session_parameter.targetCompId,
+                                         Session#session_parameter.callbackModule),
     {ok, Splitter} = fix_splitter:start_link(FixPid, Session#session_parameter.fix_version), 
     fix_splitter:newRowData(Splitter, Data),
     fix_heartbeat:start_heartbeat(Sock, WriterPid, Session#session_parameter.heartbeatInterval),
