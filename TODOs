@@ -1,0 +1,2 @@
+  * session handling
+  * separate mnesia tables for each session
