@@ -36,21 +36,17 @@
          state, timeout, frame_max]).
 
 start_link(Session) ->
-    lager:info("START_LINK READER ~p~n", [Session]),
     {ok, proc_lib:spawn_link(?MODULE, init, [self(),Session])}.
 
 start_link(Session, []) ->
-    lager:info("START_LINK READER ~p~n", [Session]),
     {ok, proc_lib:spawn_link(?MODULE, init, [self(),Session])};
 start_link(Session, Sock) ->
-    lager:info("START_LINK READER ~p~p~n", [Session, Sock]),
     {ok, proc_lib:spawn_link(?MODULE, init, [self(), Sock, Session])}.
 
 init(Parent,Session) ->
     Deb = sys:debug_options([]),
     receive
         {go, Sock} -> 
-                     lager:info("START READER ~p", [Session]),
                      start_connection(Parent, Deb, Sock, Session)
     end.
 
@@ -91,9 +87,8 @@ peername(Sock) ->
         AddressS = inet_parse:ntoa(Address),
         {AddressS, Port}
     catch
-        Ex ->io:format("error on TCP connection ~p:~p~n",
+        Ex ->lager:error("error on TCP connection ~p:~p~n",
                                [self(), Ex]),
-              io:format("closing TCP connection ~p", [self()]),
               exit(normal)
     end.
 
@@ -101,7 +96,7 @@ start_connection(Parent, Deb, ClientSock, Session) ->
     process_flag(trap_exit, true),
     {PeerAddressS, PeerPort} = peername(ClientSock),
     try 
-        io:format("starting TCP connection ~p from ~s:~p~n",
+        lager:info("starting TCP connection ~p from ~s:~p~n",
                         [self(), PeerAddressS, PeerPort]),
         erlang:send_after(?HANDSHAKE_TIMEOUT * 1000, self(),
                           handshake_timeout),
@@ -109,9 +104,13 @@ start_connection(Parent, Deb, ClientSock, Session) ->
                                                  Session#session_parameter.fix_version, 
                                                  Session#session_parameter.senderCompId, 
                                                  Session#session_parameter.targetCompId
-                                                ), 
-        fix_gateway:send(WriterPid, fix_utils:get_logon(Session#session_parameter.senderCompId,
-                                                        Session#session_parameter.targetCompId)),
+                                                ),
+        case Session#session_parameter.role of
+            initiator ->
+                        fix_gateway:send(WriterPid, fix_utils:get_logon(Session#session_parameter.senderCompId,
+                                                        Session#session_parameter.targetCompId));
+            _Else -> ok
+        end,
         mainloop(Parent, Deb, switch_callback(
                                 #state{
                                        session_par = Session,
@@ -126,10 +125,10 @@ start_connection(Parent, Deb, ClientSock, Session) ->
                                     connection_state = pre_init},
                                 handshake, 0))
     catch
-        Ex -> io:format("error on TCP connection ~p from ~s:~p~n~p~n",
+        Ex -> lager:error("error on TCP connection ~p from ~s:~p~n~p~n",
                                [self(), PeerAddressS, PeerPort, Ex])
     after
-        io:format("closing TCP connection ~p from ~s:~p~n",
+        lager:info("closing TCP connection ~p from ~s:~p~n",
                         [self(), PeerAddressS, PeerPort])
     end,
     done.
@@ -208,11 +207,11 @@ switch_callback(OldState, NewCallback, Length) ->
 
 handle_input_fix(handshake, Data,
              State = #state{session_par = Session, sock = Sock, connection = Connection, writer = WriterPid}) ->
-    io:format("TCP: ~p~n", [Data]),
     {ok, FixPid} = fix_worker:start_link(self(), WriterPid, 
                                          Session#session_parameter.senderCompId, 
                                          Session#session_parameter.targetCompId,
-                                         Session#session_parameter.callbackModule),
+                                         Session#session_parameter.callbackModule,
+                                         Session#session_parameter.role),
     {ok, Splitter} = fix_splitter:start_link(FixPid, Session#session_parameter.fix_version), 
     fix_splitter:newRowData(Splitter, Data),
     fix_heartbeat:start_heartbeat(Sock, WriterPid, Session#session_parameter.heartbeatInterval),

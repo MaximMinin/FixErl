@@ -1,7 +1,7 @@
 -record(session_parameter, {
                              id, 
                              host, port, max_reconnect, reconnect_interval, ip, 
-                             senderCompId, targetCompId, fix_version,
+                             senderCompId, targetCompId, fix_version, role,
                              heartbeatInterval, 
                              callbackModule
                            }).

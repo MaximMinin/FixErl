@@ -10,21 +10,21 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
-
+-include("fixerl.hrl").
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/5, newMessage/2, getMessages/3]).
+-export([start_link/6, newMessage/2, getMessages/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {callback, pid, fixSender, count = 0, senderCompID, targetCompID}).
+-record(state, {callback, pid, fixSender, count = 0, senderCompID, targetCompID, role}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Pid, FixSender, SenderCompID, TargetCompID, Callback) ->
-    gen_server:start_link(?MODULE, [Pid, FixSender, SenderCompID, TargetCompID, Callback], []).
+start_link(Pid, FixSender, SenderCompID, TargetCompID, Callback, Role) ->
+    gen_server:start_link(?MODULE, [Pid, FixSender, SenderCompID, TargetCompID, Callback, Role], []).
 
 newMessage(Pid, Message)->
     gen_server:cast(Pid, {message, Message}).
@@ -43,9 +43,9 @@ getMessages(Pid, From, To) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Pid, FixSender, SenderCompID, TargetCompID, Callback]) ->
+init([Pid, FixSender, SenderCompID, TargetCompID, Callback, Role]) ->
     State = #state{pid = Pid, fixSender = FixSender, 
-                   senderCompID = SenderCompID, targetCompID = TargetCompID, callback = Callback},
+                   senderCompID = SenderCompID, targetCompID = TargetCompID, callback = Callback, role = Role},
     {ok, State}.
 
 %% --------------------------------------------------------------------
@@ -71,12 +71,21 @@ handle_call(_Request, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender, count = C, callback = {M,F}} = State) ->
+handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender, 
+                                  senderCompID = SenderCompID, targetCompID = TargetCompID,
+                                  count = C, callback = {M,F}, role = Role} = State) ->
     mnesia:transaction(fun() -> mnesia:write({fix_in_messages, C+1 , Msg}) end),
     M:F(Msg),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
-        logon -> Pid ! fix_starting;
+        logon ->
+               case Role of
+                    acceptor ->
+                              fix_gateway:send(FixSender, fix_utils:get_logon(SenderCompID,
+                                                                              TargetCompID));
+              _Else -> ok
+        end,
+        Pid ! fix_starting;
         testRequest -> fix_gateway:send(FixSender, ""); 
         heartbeat -> lager:debug("HEARTBEAT: ~p~n", [Msg]);
         logout -> lager:debug("LOGOUT: ~p~n", [Msg]), 
