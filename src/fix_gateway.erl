@@ -13,7 +13,7 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/4, send/2, resend/2, send_heartbeat/1]).
+-export([start_link/5, send/2, resend/2, send_heartbeat/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -33,8 +33,8 @@ resend(Pid, Message)->
 %% ====================================================================
 %% Server functions
 %% ====================================================================
-start_link(Socket, FixVersion, SenderCompID, TargetCompID)->
-    gen_server:start_link(?MODULE, [Socket, FixVersion, SenderCompID, TargetCompID], []).
+start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id)->
+    gen_server:start_link({local, erlang:list_to_atom(lists:concat([Id, "_",?MODULE]))},?MODULE, [Socket, FixVersion, SenderCompID, TargetCompID], []).
 
 %% --------------------------------------------------------------------
 %% Function: init/1

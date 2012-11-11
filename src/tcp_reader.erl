@@ -103,7 +103,8 @@ start_connection(Parent, Deb, ClientSock, Session) ->
         {ok, WriterPid} = fix_gateway:start_link(ClientSock, 
                                                  Session#session_parameter.fix_version, 
                                                  Session#session_parameter.senderCompId, 
-                                                 Session#session_parameter.targetCompId
+                                                 Session#session_parameter.targetCompId,
+                                                 Session#session_parameter.id
                                                 ),
         case Session#session_parameter.role of
             initiator ->

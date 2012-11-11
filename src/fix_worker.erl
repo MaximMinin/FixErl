@@ -94,7 +94,8 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                                            [{fix_out_messages, Num, ResendMessage}] = mnesia:dirty_read(({fix_out_messages, Num})),
                                            fix_gateway:resend(FixSender, ResendMessage)
                                    end, 
-                                   fix_utils:get_messagesnumbers_toresend(Msg))
+                                   fix_utils:get_messagesnumbers_toresend(Msg));
+        _Else -> ok
     end,
     {noreply, State#state{count = C+1}}.
 
