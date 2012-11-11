@@ -29,8 +29,8 @@ fixerl_test_() ->
     fun(_SetupData) ->
         {inparallel,
             [
-             {timeout, 20, ?_assert(erlang:is_pid(spawn(?MODULE, sender, [])))},
-             {timeout, 20, ?_assert(receiver(0))}
+             {timeout, 60, ?_assert(erlang:is_pid(spawn(?MODULE, sender, [])))},
+             {timeout, 60, ?_assert(receiver(0))}
             ]}
 end}}.
 
@@ -41,6 +41,7 @@ application:stop(lager).
 
 start_sessions() ->
 lager:start(),
+lager:set_loglevel(lager_console_backend, notice),
 application:start(mnesia),
 Ret = application:start(fixerl),
 S1 = #session_parameter{
@@ -92,10 +93,9 @@ callback1(M) ->
 ok.
 
 receiver(0) ->
-io:format("receiver"),
   erlang:register(receiver, self()),
   receive
-     M -> lager:info("START: ~p", [erlang:now()]),
+     M -> lager:notice("START: ~p", [erlang:now()]),
            receiver(1, erlang:now())
   end.
 receiver(10000, StartTime) ->
@@ -105,7 +105,7 @@ EndTime = erlang:now(),
 {_, Ss, Sm} = StartTime,
 {_, Es, Em} = EndTime,
 Diff = Es*1000000+Em-Ss*1000000-Sm,
-lager:info("Start: ~p ENDE: ~p Diff:~p", [StartTime, EndTime,Diff]),
+lager:notice("Start: ~p ENDE: ~p Diff:~p", [StartTime, EndTime,Diff]),
 true
   end;
 receiver(X, StartTime) ->
