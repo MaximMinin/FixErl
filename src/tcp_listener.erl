@@ -19,7 +19,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {sock, on_startup, on_shutdown}).
+-record(state, {sock}).
 
 %% ====================================================================
 %% External functions
@@ -106,12 +106,11 @@ handle_info(_Info, State) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-terminate(_Reason, #state{sock=LSock, on_shutdown = {M,F,A}}) ->
+terminate(_Reason, #state{sock=LSock}) ->
     {ok, {IPAddress, Port}} = inet:sockname(LSock),
     gen_tcp:close(LSock),
     lager:error("stopped TCP listener on ~s:~p~n",
-                          [inet_parse:ntoa(IPAddress), Port]),
-    apply(M, F, A ++ [IPAddress, Port]).
+                          [inet_parse:ntoa(IPAddress), Port]).
 
 %% --------------------------------------------------------------------
 %% Func: code_change/3
