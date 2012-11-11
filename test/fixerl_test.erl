@@ -7,26 +7,48 @@
 %% Include files
 %%
 -include("fixerl.hrl").
+-include("deps/fixUtils/include/FIX_4_2.hrl").
+-include_lib("eunit/include/eunit.hrl").
 %%
 %% Exported Functions
 %%
 -export([
-          test/0, callback/1
+          start_sessions/0, stop/1, callback/1, callback1/1, receiver/1, sender/0
          ]).
 
 %%
 %% API Functions
 %%
-test() ->
-%%lager:start(),
-%%application:start(mnesia),
-%%application:start(fixerl),
+
+
+fixerl_test_() ->
+{"Simple test",
+{setup,
+    fun start_sessions/0,
+    fun stop/1,
+    fun(_SetupData) ->
+        {inparallel,
+            [
+             {timeout, 20, ?_assert(erlang:is_pid(spawn(?MODULE, sender, [])))},
+             {timeout, 20, ?_assert(receiver(0))}
+            ]}
+end}}.
+
+stop(_Args) ->
+application:stop(fixerl),
+application:stop(mnesia),
+application:stop(lager).
+
+start_sessions() ->
+lager:start(),
+application:start(mnesia),
+Ret = application:start(fixerl),
 S1 = #session_parameter{
                              id = test1, 
                              port = 12345,  
                              senderCompId = <<"TEST1">>, targetCompId = <<"TEST">>, fix_version = "FIX_4_2",
                              heartbeatInterval = 30, role = acceptor,
-                             callbackModule = {?MODULE, callback}
+                             callbackModule = {?MODULE, callback1}
                            },
 fixerl_root_sup:start_session(S1),
 S = #session_parameter{
@@ -36,10 +58,61 @@ S = #session_parameter{
                              heartbeatInterval = 30, role = initiator,
                              callbackModule = {?MODULE, callback}
                            },
-fixerl_root_sup:start_session(S).
+fixerl_root_sup:start_session(S),
+Ret.
+
+sender() ->
+timer:sleep(2000),
+lager:info("sender"),
+    RecA = #marketDataIncrementalRefresh{ standardHeader = #standardHeader{
+                                                                                msgType = marketDataIncrementalRefresh,
+                                                                                senderCompID = <<"SNDR">>,
+                                                                                targetCompID = <<"TRGT">>,
+                                                                                sendingTime = <<"20110802-10:00:00">>},
+                                             repeatingReg_marketDataIncrementalRefresh_268 = 
+                                                 [#repeatingReg_marketDataIncrementalRefresh_268{mDUpdateAction = change,
+                                                                                                     mDEntryRefID = <<"0001">>,
+                                                                                                    mDEntryPx = 10},
+                                                  #repeatingReg_marketDataIncrementalRefresh_268{mDUpdateAction = change,
+                                                                                                    mDEntryRefID = <<"0002">>,
+                                                                                                    mDEntryPx = 11}],
+                                            standardTrailer = #standardTrailer{}},
+  Nums = lists:seq(1, 15000),
+  lists:map(fun(_X) -> fix_gateway:send(test1_fix_gateway, RecA) end, Nums),
+true.
 
 callback(M) ->
-lager:info("MESSAGE IN CALLBACK: ~p", [M]).
+  %%lager:info("MESSAGE IN CALLBACK: ~p", [M]),
+  case erlang:whereis(receiver) of 
+     P when erlang:is_pid(P) -> P ! M;
+     _Else -> ok
+  end,
+  ok.
+callback1(M) ->
+ok.
+
+receiver(0) ->
+io:format("receiver"),
+  erlang:register(receiver, self()),
+  receive
+     M -> lager:info("START: ~p", [erlang:now()]),
+           receiver(1, erlang:now())
+  end.
+receiver(10000, StartTime) ->
+  receive
+     M -> 
+EndTime = erlang:now(),
+{_, Ss, Sm} = StartTime,
+{_, Es, Em} = EndTime,
+Diff = Es*1000000+Em-Ss*1000000-Sm,
+lager:info("Start: ~p ENDE: ~p Diff:~p", [StartTime, EndTime,Diff]),
+true
+  end;
+receiver(X, StartTime) ->
+  receive
+     M -> 
+           receiver(X+1, StartTime)
+  end.
 
 %%
 %% Local Functions
