@@ -8,5 +8,5 @@
                   stdlib
                  ]},
   {mod, { fixerl_app, []}},
-  {env, []}
+  {env, [{sessions, []}]}
  ]}.

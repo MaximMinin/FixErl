@@ -51,3 +51,4 @@ init([Id]) ->
     {ok, {{simple_one_for_one, 10, 10},
           [{tcp_acceptor, {tcp_acceptor, start_link, [Id]},
             transient, brutal_kill, worker, [tcp_acceptor]}]}}.
+
