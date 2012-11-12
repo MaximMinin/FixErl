@@ -13,7 +13,7 @@
 %% Exported Functions
 %%
 -export([
-          start_sessions/0, stop/1, callback/1, callback1/1, receiver/1, sender/0
+          start_sessions/0, stop/1, callback/2, callback1/2, receiver/1, sender/0
          ]).
 
 %%
@@ -79,17 +79,17 @@ lager:info("sender"),
                                                                                                     mDEntryPx = 11}],
                                             standardTrailer = #standardTrailer{}},
   Nums = lists:seq(1, 15000),
-  lists:map(fun(_X) -> fix_gateway:send(test1_fix_gateway, RecA) end, Nums),
+  lists:map(fun(_X) -> fix_gateway:send(test1, RecA) end, Nums),
 true.
 
-callback(M) ->
+callback(_Id, M) ->
   %%lager:info("MESSAGE IN CALLBACK: ~p", [M]),
   case erlang:whereis(receiver) of 
      P when erlang:is_pid(P) -> P ! M;
      _Else -> ok
   end,
   ok.
-callback1(M) ->
+callback1(_Id, M) ->
 ok.
 
 receiver(0) ->
