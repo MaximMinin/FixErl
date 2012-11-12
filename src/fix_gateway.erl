@@ -34,7 +34,8 @@ resend(Pid, Message)->
 %% Server functions
 %% ====================================================================
 start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id)->
-    gen_server:start_link({local, erlang:list_to_atom(lists:concat([Id, "_",?MODULE]))},?MODULE, [Socket, FixVersion, SenderCompID, TargetCompID], []).
+    %% gen_server:start_link({local, erlang:list_to_atom(lists:concat([Id, "_",?MODULE]))},?MODULE, [Socket, FixVersion, SenderCompID, TargetCompID], []).
+    gen_server:start_link({local, Id},?MODULE, [Socket, FixVersion, SenderCompID, TargetCompID], []).
 
 %% --------------------------------------------------------------------
 %% Function: init/1

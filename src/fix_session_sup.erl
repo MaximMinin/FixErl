@@ -23,7 +23,7 @@
 %% ===================================================================
 
 start_link(#session_parameter{id = Id} = S) ->
-    supervisor:start_link({local, Id}, ?MODULE, [S]).
+    supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_",?MODULE]))}, ?MODULE, [S]).
 
 %% ===================================================================
 %% Supervisor callbacks
