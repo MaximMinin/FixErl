@@ -13,18 +13,18 @@
 -include("fixerl.hrl").
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/6, newMessage/2, getMessages/3]).
+-export([start_link/7, newMessage/2, getMessages/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {callback, pid, fixSender, count = 0, senderCompID, targetCompID, role}).
+-record(state, {callback, pid, fixSender, count = 0, senderCompID, targetCompID, role, session_id}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Pid, FixSender, SenderCompID, TargetCompID, Callback, Role) ->
-    gen_server:start_link(?MODULE, [Pid, FixSender, SenderCompID, TargetCompID, Callback, Role], []).
+start_link(Pid, FixSender, SenderCompID, TargetCompID, Callback, Role, SessionId) ->
+    gen_server:start_link(?MODULE, [Pid, FixSender, SenderCompID, TargetCompID, Callback, Role, SessionId], []).
 
 newMessage(Pid, Message)->
     gen_server:cast(Pid, {message, Message}).
@@ -43,8 +43,8 @@ getMessages(Pid, From, To) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Pid, FixSender, SenderCompID, TargetCompID, Callback, Role]) ->
-    State = #state{pid = Pid, fixSender = FixSender, 
+init([Pid, FixSender, SenderCompID, TargetCompID, Callback, Role, SessionId]) ->
+    State = #state{pid = Pid, fixSender = FixSender, session_id = SessionId,
                    senderCompID = SenderCompID, targetCompID = TargetCompID, callback = Callback, role = Role},
     {ok, State}.
 
@@ -73,9 +73,9 @@ handle_call(_Request, _From, State) ->
 %% --------------------------------------------------------------------
 handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender, 
                                   senderCompID = SenderCompID, targetCompID = TargetCompID,
-                                  count = C, callback = {M,F}, role = Role} = State) ->
+                                  count = C, callback = {M,F}, role = Role, session_id = Id} = State) ->
     mnesia:transaction(fun() -> mnesia:write({fix_in_messages, C+1 , Msg}) end),
-    M:F(Msg),
+    M:F(Id, Msg),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon ->
