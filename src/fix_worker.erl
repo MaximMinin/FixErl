@@ -75,18 +75,17 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                                   senderCompID = SenderCompID, targetCompID = TargetCompID,
                                   count = C, callback = {M,F}, role = Role, session_id = Id} = State) ->
     mnesia:transaction(fun() -> mnesia:write({fix_in_messages, C+1 , Msg}) end),
-    M:F(Id, Msg),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon ->
-               case Role of
+                case Role of
                     acceptor ->
                               fix_gateway:send(FixSender, fix_utils:get_logon(SenderCompID,
                                                                               TargetCompID));
-              _Else -> ok
-        end,
-        Pid ! fix_starting;
-        testRequest -> fix_gateway:send(FixSender, ""); 
+                    initiator -> ok
+                end,
+                Pid ! fix_starting;
+        testRequest -> fix_gateway:send(FixSender, ""); %%TODO
         heartbeat -> lager:debug("HEARTBEAT: ~p~n", [Msg]);
         logout -> lager:debug("LOGOUT: ~p~n", [Msg]), 
                   erlang:exit(fix_session_close);
@@ -95,7 +94,7 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                                            fix_gateway:resend(FixSender, ResendMessage)
                                    end, 
                                    fix_utils:get_messagesnumbers_toresend(Msg));
-        _Else -> ok
+        _Else -> M:F(Id, Msg)
     end,
     {noreply, State#state{count = C+1}}.
 

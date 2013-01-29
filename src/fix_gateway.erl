@@ -81,7 +81,7 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
     try 
         NewCount = Count+1,
         Record = convertor:setMsgSeqNum(fix_utils:get_heartbeat(SenderCompID, TargetCompID), NewCount, FixVersion), 
-        Bin = convertor:convertRecordtoFix(Record, FixVersion), 
+        Bin = convertor:convertRecorToFix(Record, FixVersion), 
         mnesia:transaction(fun() -> mnesia:write({fix_out_messages, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:debug("FIX OUT MESSAGE: ~p", [convertor:format(Record, FixVersion)])
@@ -98,7 +98,7 @@ handle_cast({send, Record}, #state{socket = Socket, count = Count, fix_version =
     NewCount = Count+1,
     try 
         NewRecord = convertor:setMsgSeqNum(Record, NewCount, FixVersion), 
-        Bin = convertor:convertRecordtoFix(NewRecord, FixVersion), 
+        Bin = convertor:convertRecordToFix(NewRecord, FixVersion), 
         mnesia:transaction(fun() -> mnesia:write({fix_out_messages, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:info("FIX OUT MESSAGE -> ~p", [convertor:format(NewRecord, FixVersion)])
