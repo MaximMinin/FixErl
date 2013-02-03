@@ -1,3 +1,11 @@
+%%% -------------------------------------------------------------------
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
+%%%
+%%% @end
+%%% -------------------------------------------------------------------
 -module(fixerl_app).
 
 -behaviour(application).
@@ -15,7 +23,8 @@ start(_StartType, _StartArgs) ->
         undefined -> ok;
         {ok, []} -> ok;
         {ok, Sessions} ->
-                   lists:map(fun(S) -> fixerl_root_sup:start_session(S) end, Sessions)
+            lists:map(fun(S) ->
+                fixerl_root_sup:start_session(S) end, Sessions)
     end,
     R.
 stop(_State) ->

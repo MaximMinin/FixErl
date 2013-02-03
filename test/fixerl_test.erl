@@ -51,7 +51,7 @@ S1 = #session_parameter{
                              heartbeatInterval = 30, role = acceptor,
                              callbackModule = {?MODULE, callback1}
                            },
-fixerl_root_sup:start_session(S1),
+fixerl:start_session(S1),
 S = #session_parameter{
                              id = test, 
                              host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
@@ -59,7 +59,7 @@ S = #session_parameter{
                              heartbeatInterval = 30, role = initiator,
                              callbackModule = {?MODULE, callback}
                            },
-fixerl_root_sup:start_session(S),
+fixerl:start_session(S),
 Ret.
 
 sender() ->
@@ -106,6 +106,8 @@ EndTime = erlang:now(),
 {_, Es, Em} = EndTime,
 Diff = Es*1000000+Em-Ss*1000000-Sm,
 lager:notice("Start: ~p ENDE: ~p Diff:~p", [StartTime, EndTime,Diff]),
+fixerl:stop_session(test),
+fixerl:stop_session(test1),
 true
   end;
 receiver(X, StartTime) ->

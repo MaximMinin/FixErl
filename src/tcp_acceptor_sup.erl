@@ -1,8 +1,11 @@
 %%% -------------------------------------------------------------------
-%%% Author  : Maxim Minin
-%%% Description :
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
 %%%
 %%% Created : 28.06.2012
+%%% @end
 %%% -------------------------------------------------------------------
 -module(tcp_acceptor_sup).
 

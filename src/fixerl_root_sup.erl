@@ -1,8 +1,11 @@
 %%% -------------------------------------------------------------------
-%%% Author  : Maxim Minin
-%%% Description :
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
 %%%
 %%% Created : 28.06.2012
+%%% @end
 %%% -------------------------------------------------------------------
 -module(fixerl_root_sup).
 
@@ -14,14 +17,12 @@
 %% --------------------------------------------------------------------
 %% External exports
 %% --------------------------------------------------------------------
--export([start_link/0, start_session/1]).
+-export([start_link/0, start_session/1, stop_session/1]).
 
 %% --------------------------------------------------------------------
 %% Internal exports
 %% --------------------------------------------------------------------
--export([
-	 init/1
-        ]).
+-export([init/1]).
 
 %% --------------------------------------------------------------------
 %% Macros
@@ -41,6 +42,11 @@ start_link() ->
 
 start_session(#session_parameter{}=S) ->
     supervisor:start_child(?MODULE, [S]).
+
+stop_session(SessionId) ->
+    lager:info("Stop child: ~p - ~p",[SessionId, whereis(SessionId)]),
+    supervisor:terminate_child(?MODULE, whereis(SessionId)).
+
 %% ====================================================================
 %% Server functions
 %% ====================================================================

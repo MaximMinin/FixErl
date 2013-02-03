@@ -9,3 +9,7 @@ rebar
 *.plt
 .project
 .settings/*
+rel/fixerl
+rel/files
+.gitignore
+doc

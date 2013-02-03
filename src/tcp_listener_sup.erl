@@ -1,8 +1,11 @@
 %%% -------------------------------------------------------------------
-%%% Author  : Maxim Minin
-%%% Description :
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
 %%%
 %%% Created : 28.06.2012
+%%% @end
 %%% -------------------------------------------------------------------
 -module(tcp_listener_sup).
 
@@ -30,11 +33,13 @@
 %% External functions
 %% ====================================================================
 start_link(Id, undefined, Port, undefined, undefined) ->
-    supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_", ?MODULE]))},
-      ?MODULE, {Port, Id});
+    supervisor:start_link({local, 
+        list_to_atom(lists:concat([Id, "_", ?MODULE]))},
+        ?MODULE, {Port, Id});
 start_link(Id, Host, Port, MaxReconnect, ReconnectTimeout) ->
-    supervisor:start_link({local, erlang:list_to_atom(lists:concat([Id, "_", ?MODULE]))},
-      ?MODULE, {Host, Port, MaxReconnect, ReconnectTimeout, Id}).
+    supervisor:start_link({local, 
+        list_to_atom(lists:concat([Id, "_", ?MODULE]))},
+        ?MODULE, {Host, Port, MaxReconnect, ReconnectTimeout, Id}).
 
 %% ====================================================================
 %% Server functions
@@ -49,7 +54,7 @@ init({Port, Id}) ->
     Name = tcp_name(tcp_acceptor_sup, Port),
     {ok, {{one_for_all, 10, 10},
           [{tcp_acceptor_sup, {tcp_acceptor_sup, start_link,
-                               [Name, erlang:list_to_atom(lists:concat([Id, "_", tcp_client_sup]))]},
+                               [Name, get_sup_id(Id)]},
             transient, infinity, supervisor, [tcp_acceptor_sup]},
            {tcp_listener, {tcp_listener, start_link,
                            [Port, 1, Name]},
@@ -61,7 +66,8 @@ init({Host, Port, MaxReconnect, ReconnectTimeout, Id}) ->
                                [Name]},
             transient, infinity, supervisor, [tcp_acceptor_sup]},
            {tcp_connector, {tcp_connector, start_link,
-                           [Host, Port, erlang:list_to_atom(lists:concat([Id, "_", tcp_client_sup])), MaxReconnect, ReconnectTimeout]},
+                           [Host, Port, get_sup_id(Id),
+                            MaxReconnect, ReconnectTimeout]},
             transient, infinity, worker, [tcp_connector]}
           ]
          }
@@ -71,12 +77,16 @@ init({Host, Port, MaxReconnect, ReconnectTimeout, Id}) ->
 %%
 %% Local Functions
 %%
+get_sup_id(Id) ->
+    list_to_atom(lists:concat([Id, "_", tcp_client_sup])).
+
 tcp_name(Prefix, Port)
   when is_number(Port) ->
     list_to_atom(
       lists:flatten(
         io_lib:format("~w_:~w",
                       [Prefix, Port]))).
+
 tcp_name(Prefix, Host, Port)
   when is_number(Port) ->
     list_to_atom(

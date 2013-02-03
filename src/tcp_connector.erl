@@ -1,6 +1,12 @@
-%% Author: Maxim Minin
-%% Created: 23.06.2012
-%% Description: TODO: Add description to tcp_connector
+%%% -------------------------------------------------------------------
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
+%%%
+%%% Created: 23.06.2012
+%%% @end
+%%% -------------------------------------------------------------------
 -module(tcp_connector).
 
 %%

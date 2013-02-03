@@ -1,6 +1,12 @@
-%% Author: Maxim Minin
-%% Created: 03.06.2012
-%% Description: TODO: Add description to helper
+%%% -------------------------------------------------------------------
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
+%%%
+%%% Created : 03.06.2012
+%%% @end
+%%% -------------------------------------------------------------------
 -module(fix_splitter).
 
 -behaviour(gen_server).
@@ -13,7 +19,8 @@
 -export([start_link/2, newRowData/2]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, 
+         handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {last = <<>>, clientPid, fix_version}).
 
@@ -61,13 +68,16 @@ handle_call(_Request, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid, fix_version = FixVersion} = State) ->
+handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid, 
+            fix_version = FixVersion} = State) ->
     {Broken, Messages} = split(binary:list_to_bin([Last, Data])),
     lists:map(fun(M) ->  
       try Rec = convertor:convertFixToRecord(M, FixVersion),
           fix_worker:newMessage(ClientPid, Rec),
-          lager:info("FIX IN MESSAGE <- ~p", [convertor:format(Rec, FixVersion)])
-     catch error:Error -> lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
+          lager:info("FIX IN MESSAGE <- ~p", 
+                    [convertor:format(Rec, FixVersion)])
+     catch error:Error -> 
+            lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
      end
      end, Messages),
     {noreply, State#state{last = Broken}}.
@@ -110,8 +120,10 @@ split([E|[]], Last, ToReturn) ->
         [<<>>] ->
             {Last, ToReturn};
         [Int|Rest] ->
-             {binary:list_to_bin(Rest), [binary:list_to_bin([Last, <<"10=">>, Int, <<1>>])|ToReturn]}
+            {binary:list_to_bin(Rest), 
+            [binary:list_to_bin([Last,<<"10=">>,Int,<<1>>])|ToReturn]}
     end;
 split([E|Liste], Last, ToReturn) ->
     [Int|Rest] =  binary:split(E, <<1>>), 
-    split(Liste, Rest, [binary:list_to_bin([Last, <<"10=">>, Int, <<1>>])|ToReturn]). 
+    split(Liste, Rest, 
+         [binary:list_to_bin([Last, <<"10=">>, Int, <<1>>])|ToReturn]). 

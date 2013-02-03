@@ -1,8 +1,11 @@
 %%% -------------------------------------------------------------------
-%%% Author  : Maxim Minin
-%%% Description :
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
 %%%
 %%% Created : 28.06.2012
+%%% @end
 %%% -------------------------------------------------------------------
 -module(tcp_listener).
 
@@ -45,19 +48,19 @@ init({Port, ConcurrentAcceptorCount, AcceptorSup}) ->
     case gen_tcp:listen(Port, 
                         [
                          binary,
-                         {packet, raw}, % no packaging
-                         {reuseaddr, true}, % allow rebind without waiting
+                         {packet, raw},
+                         {reuseaddr, true},
                          {exit_on_close, false},
                          {active, false}]) of
         {ok, LSock} ->
             lists:foreach(fun (_) ->
-                                  {ok, _APid} = supervisor:start_child(
-                                                  AcceptorSup, [LSock])
-                          end,
-                          lists:duplicate(ConcurrentAcceptorCount, dummy)),
+                              {ok, _APid} = supervisor:start_child(
+                                                AcceptorSup, [LSock])
+                          end, 
+                lists:duplicate(ConcurrentAcceptorCount, dummy)),
             {ok, {LIPAddress, LPort}} = inet:sockname(LSock),
             lager:error("started TCP listener on ~s:~p~n",
-                                  [inet_parse:ntoa(LIPAddress), LPort]),
+                        [inet_parse:ntoa(LIPAddress), LPort]),
             {ok, #state{
                         sock=LSock
                        }};

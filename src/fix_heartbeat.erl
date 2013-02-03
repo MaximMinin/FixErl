@@ -1,6 +1,12 @@
-%% Author: Maxim Minin
-%% Created: 28.06.2012
-%% Description: TODO: Add description to new_file
+%%% -------------------------------------------------------------------
+%%% @private
+%%% @author  : Maxim Minin
+%%% @doc
+%%% Description : @TODO
+%%%
+%%% Created: 28.06.2012
+%%% @end
+%%% -------------------------------------------------------------------
 -module(fix_heartbeat).
 %%
 %% Include files
