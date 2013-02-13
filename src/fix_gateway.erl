@@ -94,17 +94,17 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
         mnesia:transaction(fun() -> 
             mnesia:write({fix_out_messages, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
-        lager:debug("FIX OUT MESSAGE: ~p", 
+        lager:debug("SEND HEARTBEAT: ~p", 
                     [convertor:format(Record, FixVersion)])
     catch error:Error -> 
-            lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
+            lager:error("~p", [Error])
     end,
     {noreply, State};
 handle_cast({resend, Bin}, #state{socket = Socket} = State) ->
     try 
         gen_tcp:send(Socket, Bin)
     catch error:Error -> 
-            lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
+            lager:error("~p", [Error])
     end,
     {noreply, State};
 handle_cast({send, Record}, #state{socket = Socket, count = Count, 
@@ -121,7 +121,7 @@ handle_cast({send, Record}, #state{socket = Socket, count = Count,
         lager:info("FIX OUT MESSAGE -> ~p", 
                    [convertor:format(NewRecord, FixVersion)])
     catch error:Error -> 
-            lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
+            lager:error("~p", [Error])
     end,
     {noreply, State#state{count = NewCount}};
 handle_cast(_Msg, State) ->

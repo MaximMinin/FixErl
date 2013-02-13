@@ -77,7 +77,8 @@ handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid,
           lager:info("FIX IN MESSAGE <- ~p", 
                     [convertor:format(Rec, FixVersion)])
      catch error:Error -> 
-            lager:error("~p - ERROR: ~p~n", [?MODULE, Error])
+            lager:error("~p - MESSAGE CAN NOT BE INTERPRETED: ~p~n",
+                        [M, Error])
      end
      end, Messages),
     {noreply, State#state{last = Broken}}.
