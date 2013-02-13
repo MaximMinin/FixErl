@@ -90,7 +90,7 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
         Record = convertor:setMsgSeqNum(fix_utils:get_heartbeat(
                                         SenderCompID, TargetCompID), 
                                         NewCount, FixVersion), 
-        Bin = convertor:convertRecorToFix(Record, FixVersion), 
+        Bin = convertor:convertRecordToFix(Record, FixVersion), 
         mnesia:transaction(fun() -> 
             mnesia:write({fix_out_messages, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
