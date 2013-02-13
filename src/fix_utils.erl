@@ -17,11 +17,43 @@
 %% Exported Functions
 %%
 -export([get_logon/2, get_heartbeat/2, get_heartbeat/1,
-         get_numbers/1, getNow/0, getNow/1, getUniq/0]).
+         get_numbers/1, getNow/0, getNow/1, getUniq/0,
+         check_logon/3, get_logout/2]).
 
 %% ====================================================================
 %% API Functions
 %% ====================================================================
+
+%% --------------------------------------------------------------------
+%% @doc Checks the logon message
+%%
+%% @spec get_logon(Logon::#logon{},
+%%                 SenderCompID::binary(), 
+%%                 TargetCompID::binary()) -> ok|nok
+%% @end
+%% --------------------------------------------------------------------
+check_logon(#logon{standardHeader = #standardHeader{
+                senderCompID = TargetCompID, 
+                targetCompID = SenderCompID}},
+            SenderCompID, TargetCompID) -> ok;
+check_logon(_,_,_) -> nok.
+
+
+%% --------------------------------------------------------------------
+%% @doc Gets the logout message
+%%
+%% @spec get_logout(SenderCompID::binary(), 
+%%                 TargetCompID::binary()) -> #logout{}
+%% @end
+%% --------------------------------------------------------------------
+get_logout(SenderCompID, TargetCompID) ->
+    #logout{standardHeader = #standardHeader{
+                msgType = logout,
+                sendingTime = ?MODULE:getNow(),
+                senderCompID = SenderCompID, 
+                targetCompID = TargetCompID},
+           standardTrailer = #standardTrailer{}}.
+
 
 %% --------------------------------------------------------------------
 %% @doc Gets the logon message

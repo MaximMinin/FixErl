@@ -93,26 +93,42 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
         mnesia:write({fix_in_messages, C+1 , Msg}) end),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
-        logon ->
-            case Role of
-                acceptor ->
-                    fix_gateway:send(FixSender,
+        logon -> lager:debug("LOGON: ~p~n", [Msg]),
+            case fix_utils:check_logon(Msg, 
+                                       SenderCompID, 
+                                       TargetCompID) of
+                ok -> 
+                    case Role of
+                        acceptor ->
+                            fix_gateway:send(FixSender,
                                     fix_utils:get_logon(SenderCompID,
                                                        TargetCompID));
-                initiator -> ok
-            end,
-            Pid ! fix_starting;
-        testRequest -> fix_gateway:send(FixSender, ""); %%TODO
+                        initiator -> ok
+                    end,
+                    Pid ! fix_starting;
+                nok -> 
+                    fix_gateway:send(FixSender,
+                        fix_utils:get_logout(SenderCompID,
+                                              TargetCompID)),
+                    erlang:exit(false_logon)
+            end;
+        testRequest -> lager:debug("TESTREQUEST: ~p~n", [Msg]),
+                  fix_gateway:send(FixSender,
+                                        fix_utils:get_heartbeat(Msg));
         heartbeat -> lager:debug("HEARTBEAT: ~p~n", [Msg]);
         logout -> lager:debug("LOGOUT: ~p~n", [Msg]), 
+                  fix_gateway:send(FixSender,
+                      fix_utils:get_logout(SenderCompID,
+                                            TargetCompID)),
                   erlang:exit(fix_session_close);
-        resendRequest ->
+        resendRequest -> lager:debug("RESENDREQUEST: ~p~n", [Msg]),
             lists:map(fun(Num) -> 
                 [{fix_out_messages, Num, ResendMessage}] = 
                  mnesia:dirty_read(({fix_out_messages, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(Msg));
-        _Else -> M:F(Id, Msg)
+        _Else -> lager:debug("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),
+                 M:F(Id, Msg)
     end,
     {noreply, State#state{count = C+1}}.
 
