@@ -31,7 +31,7 @@ start() ->
 %% @doc Starts the fix session
 %%
 %% @spec start_session(SessionParams::#session_parameter{}) ->
-%%      {ok, pid} | {error, Reason}
+%%      {ok, pid()} | {error, Reason}
 %%
 %% @end
 %% --------------------------------------------------------------------

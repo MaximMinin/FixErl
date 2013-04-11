@@ -37,12 +37,32 @@
 %% External functions
 %% ====================================================================
 
+%% --------------------------------------------------------------------
+%% Func: start_link/0
+%% Returns: {ok,  pid()} |
+%%          {error, Reason}
+%% --------------------------------------------------------------------
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+%% --------------------------------------------------------------------
+%% @doc Starts the fix session
+%%
+%% @spec start_session(SessionParams::#session_parameter{}) ->
+%%      {ok, pid()} | {error, Reason}
+%%
+%% @end
 start_session(#session_parameter{}=S) ->
+    lager:info("Start session: ~p",[S]),
     supervisor:start_child(?MODULE, [S]).
 
+%% --------------------------------------------------------------------
+%% @doc Stop the fix session
+%%
+%% @spec stop_session(SessionId::atom()) -> ok
+%%
+%% @end
+%% --------------------------------------------------------------------
 stop_session(SessionId) ->
     lager:info("Stop child: ~p - ~p",[SessionId, whereis(SessionId)]),
     supervisor:terminate_child(?MODULE, whereis(SessionId)).
@@ -50,6 +70,7 @@ stop_session(SessionId) ->
 %% ====================================================================
 %% Server functions
 %% ====================================================================
+
 %% --------------------------------------------------------------------
 %% Func: init/1
 %% Returns: {ok,  {SupFlags,  [ChildSpec]}} |
