@@ -2,7 +2,7 @@
                              id, 
                              host, port, max_reconnect, reconnect_interval, ip, 
                              senderCompId, targetCompId, fix_version, role,
-                             heartbeatInterval, 
+                             heartbeatInterval, start_seqnum,
                              callbackModule
                            }).
 -record(fix_in_messages, {number, message}).

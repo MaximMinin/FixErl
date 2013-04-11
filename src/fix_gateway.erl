@@ -16,7 +16,7 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/5, send/2, resend/2, send_heartbeat/1]).
+-export([start_link/6, send/2, resend/2, send_heartbeat/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
@@ -38,9 +38,9 @@ resend(Pid, Message)->
 %% ====================================================================
 %% Server functions
 %% ====================================================================
-start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id)->
+start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id, StartSeqNum)->
     gen_server:start_link({local, Id},?MODULE, 
-        [Socket, FixVersion, SenderCompID, TargetCompID], []).
+        [Socket, FixVersion, SenderCompID, TargetCompID, StartSeqNum], []).
 
 %% --------------------------------------------------------------------
 %% Function: init/1
@@ -50,7 +50,7 @@ start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id)->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Socket, FixVersion, SenderCompID, TargetCompID]) ->
+init([Socket, FixVersion, SenderCompID, TargetCompID, undefined]) ->
     case mnesia:table_info(fix_out_messages, size) of
         C when erlang:is_integer(C) -> 
             {ok, #state{socket = Socket, count = C, 
@@ -59,7 +59,12 @@ init([Socket, FixVersion, SenderCompID, TargetCompID]) ->
                         targetCompID = TargetCompID}};
         {aborted, Reason} ->
             {stop, Reason}
-    end.
+    end;
+init([Socket, FixVersion, SenderCompID, TargetCompID, StartSeqNum]) ->
+    {ok, #state{socket = Socket, count = StartSeqNum, 
+                fix_version = FixVersion, 
+                senderCompID = SenderCompID, 
+                targetCompID = TargetCompID}}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3

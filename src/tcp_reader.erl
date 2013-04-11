@@ -107,7 +107,8 @@ start_connection(Parent, Deb, ClientSock, Session) ->
                                                  Session#session_parameter.fix_version, 
                                                  Session#session_parameter.senderCompId, 
                                                  Session#session_parameter.targetCompId,
-                                                 Session#session_parameter.id
+                                                 Session#session_parameter.id,
+                                                 Session#session_parameter.start_seqnum
                                                 ),
         case Session#session_parameter.role of
             initiator ->
