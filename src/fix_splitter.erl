@@ -125,6 +125,17 @@ split([E|[]], Last, ToReturn) ->
             [binary:list_to_bin([Last,<<"10=">>,Int,<<1>>])|ToReturn]}
     end;
 split([E|Liste], Last, ToReturn) ->
-    [Int|Rest] =  binary:split(E, <<1>>), 
-    split(Liste, Rest, 
-         [binary:list_to_bin([Last, <<"10=">>, Int, <<1>>])|ToReturn]). 
+    [Int|Rest] =  binary:split(E, <<1>>),
+    CheckSum = lists:sum(erlang:binary_to_list(Last)) rem 256,
+    case CheckSum == list_to_integer(binary_to_list(Int)) of
+        true ->
+            split(Liste, Rest, 
+                [binary:list_to_bin([Last, 
+                                    <<"10=">>, 
+                                    Int, <<1>>])|ToReturn]);
+        false -> 
+            lager:error("MESSAGE IS NOT VALID: ~p", 
+                [binary:list_to_bin([Last, <<"10=">>, Int, <<1>>])]),
+            split(Liste, Rest, ToReturn)
+    end.
+
