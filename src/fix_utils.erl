@@ -68,8 +68,9 @@ get_logon(SenderCompID, TargetCompID) ->
                 sendingTime = ?MODULE:getNow(),
                 senderCompID = SenderCompID, 
                 targetCompID = TargetCompID},
+           encryptMethod = none, %%TODO
            standardTrailer = #standardTrailer{},
-           repeatingReg_logon_384 = [#repeatingReg_logon_384{}],
+           rgr_logon_384 = [#rgr_logon_384{}],
            heartBtInt = 30}.
 
 %% --------------------------------------------------------------------
