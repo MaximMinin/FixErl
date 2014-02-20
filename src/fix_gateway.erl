@@ -92,15 +92,15 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
             fix_version = FixVersion} = State) ->
     try 
         NewCount = Count+1,
-        Record = convertor:setMsgSeqNum(fix_utils:get_heartbeat(
+        Record = fix_convertor:set_msg_seqnum(fix_utils:get_heartbeat(
                                         SenderCompID, TargetCompID), 
                                         NewCount, FixVersion), 
-        Bin = convertor:convertRecordToFix(Record, FixVersion), 
+        Bin = fix_convertor:record2fix(Record, FixVersion), 
         mnesia:transaction(fun() -> 
             mnesia:write({fix_out_messages, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:debug("SEND HEARTBEAT: ~p", 
-                    [convertor:format(Record, FixVersion)])
+                    [fix_convertor:format(Record, FixVersion)])
     catch error:Error -> 
             lager:error("~p", [Error])
     end,
@@ -116,18 +116,18 @@ handle_cast({send, Record}, #state{socket = Socket, count = Count,
                                    fix_version = FixVersion} = State)
             when erlang:is_tuple(Record) ->
     NewCount = Count+1,
-    try 
-        NewRecord = convertor:setMsgSeqNum(Record, 
+%%     try 
+        NewRecord = fix_convertor:set_msg_seqnum(Record, 
                                            NewCount, FixVersion), 
-        Bin = convertor:convertRecordToFix(NewRecord, FixVersion), 
+        Bin = fix_convertor:record2fix(NewRecord, FixVersion), 
         mnesia:transaction(fun() -> 
             mnesia:write({fix_out_messages, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:info("FIX OUT MESSAGE -> ~p", 
-                   [convertor:format(NewRecord, FixVersion)])
-    catch error:Error -> 
-            lager:error("~p", [Error])
-    end,
+                   [fix_convertor:format(NewRecord, FixVersion)]),
+%%     catch _:Error -> 
+%%             lager:error("~p", [Error])
+%%     end,
     {noreply, State#state{count = NewCount}};
 handle_cast(_Msg, State) ->
     {noreply, State}.

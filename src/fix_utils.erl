@@ -12,7 +12,7 @@
 %%
 %% Include files
 %%
--include("FIX_4_2.hrl").
+-include_lib("fix_convertor/include/FIX_4_2.hrl").
 %%
 %% Exported Functions
 %%
@@ -131,7 +131,7 @@ getNow(AddTimeInSec) ->
     AddMin = AddTimeInSec div 60,
     {{Year, Month, Day}, {Hour, Minute, Second}} = 
         erlang:universaltime(),
-    list_to_binary(lists:concat([integer_to_list(Year),
+    lists:concat([integer_to_list(Year),
                                  getTwoDigits(Month),
                                  getTwoDigits(Day),
                                  "-",
@@ -139,7 +139,7 @@ getNow(AddTimeInSec) ->
                                  ":",
                                  getTwoDigits(Minute+AddMin),
                                  ":",
-                                 getTwoDigits(Second+AddSec)])).
+                                 getTwoDigits(Second+AddSec)]).
 
 %% --------------------------------------------------------------------
 %% @doc Gets timestamp in fix format (yyyyMMdd-hh:mm:ss)
@@ -151,7 +151,7 @@ getNow(AddTimeInSec) ->
 getNow() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = 
         erlang:universaltime(),
-    list_to_binary(lists:concat([integer_to_list(Year),
+    lists:concat([integer_to_list(Year),
                                  getTwoDigits(Month),
                                  getTwoDigits(Day),
                                  "-",
@@ -159,7 +159,7 @@ getNow() ->
                                  ":",
                                  getTwoDigits(Minute),
                                  ":",
-                                 getTwoDigits(Second)])).
+                                 getTwoDigits(Second)]).
 
 %% --------------------------------------------------------------------
 %% @doc Gets uniq id for fix message
@@ -170,7 +170,7 @@ getNow() ->
 %% --------------------------------------------------------------------
 getUniq () ->
     {MegaSecs, Secs, MicroSecs} = now(),
-    list_to_binary(lists:concat([MegaSecs,Secs,MicroSecs])).
+    lists:concat([MegaSecs,Secs,MicroSecs]).
 
 
     

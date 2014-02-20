@@ -18,11 +18,6 @@
 -export([init/3, init/2, mainloop/3]).
 
 
--import(gen_tcp).
--import(fprof).
--import(inet).
--import(prim_inet).
-
 -define(HANDSHAKE_TIMEOUT, 10).
 -define(NORMAL_TIMEOUT, 3).
 -define(CLOSING_TIMEOUT, 1).

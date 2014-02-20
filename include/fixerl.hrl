@@ -1,7 +1,9 @@
+-include_lib("fix_convertor/include/fix_convertor.hrl").
 -record(session_parameter, {
                              id, 
                              host, port, max_reconnect, reconnect_interval, ip, 
-                             senderCompId, targetCompId, fix_version, role,
+                             senderCompId, targetCompId, 
+                             fix_version :: fix_version(), role,
                              heartbeatInterval, start_seqnum,
                              callbackModule
                            }).

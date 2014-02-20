@@ -72,10 +72,10 @@ handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid,
             fix_version = FixVersion} = State) ->
     {Broken, Messages} = split(binary:list_to_bin([Last, Data])),
     lists:map(fun(M) ->  
-      try Rec = convertor:convertFixToRecord(M, FixVersion),
+      try Rec = fix_convertor:fix2record(M, FixVersion),
           fix_worker:newMessage(ClientPid, Rec),
           lager:info("FIX IN MESSAGE <- ~p", 
-                    [convertor:format(Rec, FixVersion)])
+                    [fix_convertor:format(Rec, FixVersion)])
      catch error:Error -> 
             lager:error("~p - MESSAGE CAN NOT BE INTERPRETED: ~p~n",
                         [M, Error])

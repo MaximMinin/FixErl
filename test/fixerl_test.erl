@@ -7,7 +7,7 @@
 %% Include files
 %%
 -include("fixerl.hrl").
--include("deps/fixUtils/include/FIX_4_2.hrl").
+-include_lib("fix_convertor/include/FIX_4_2.hrl").
 -include_lib("eunit/include/eunit.hrl").
 %%
 %% Exported Functions
@@ -29,8 +29,8 @@ fixerl_test_() ->
     fun(_SetupData) ->
         {inparallel,
             [
-             {timeout, 60, ?_assert(erlang:is_pid(spawn(?MODULE, sender, [])))},
-             {timeout, 60, ?_assert(receiver(0))}
+             {timeout, 600, ?_assert(erlang:is_pid(spawn(?MODULE, sender, [])))},
+             {timeout, 600, ?_assert(receiver(0))}
             ]}
 end}}.
 
@@ -47,7 +47,7 @@ Ret = application:start(fixerl),
 S1 = #session_parameter{
                              id = test1, 
                              port = 12345,  
-                             senderCompId = <<"TEST1">>, targetCompId = <<"TEST">>, fix_version = "FIX_4_2",
+                             senderCompId = "TEST1", targetCompId = "TEST", fix_version = 'FIX 4.2',
                              heartbeatInterval = 30, role = acceptor,
                              callbackModule = {?MODULE, callback1}
                            },
@@ -55,7 +55,7 @@ fixerl:start_session(S1),
 S = #session_parameter{
                              id = test, 
                              host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
-                             senderCompId = <<"TEST">>, targetCompId = <<"TEST1">>, fix_version = "FIX_4_2",
+                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = 'FIX 4.2',
                              heartbeatInterval = 30, role = initiator,
                              callbackModule = {?MODULE, callback}
                            },
@@ -67,15 +67,15 @@ timer:sleep(2000),
 lager:info("sender"),
     RecA = #marketDataIncrementalRefresh{ standardHeader = #standardHeader{
                                                                                 msgType = marketDataIncrementalRefresh,
-                                                                                senderCompID = <<"SNDR">>,
-                                                                                targetCompID = <<"TRGT">>,
-                                                                                sendingTime = <<"20110802-10:00:00">>},
+                                                                                senderCompID = "SNDR",
+                                                                                targetCompID = "TRGT",
+                                                                                sendingTime = "20110802-10:00:00"},
                                              rgr_marketDataIncrementalRefresh_268 = 
                                                  [#rgr_marketDataIncrementalRefresh_268{mDUpdateAction = change,
-                                                                                                     mDEntryRefID = <<"0001">>,
+                                                                                                     mDEntryRefID = "0001",
                                                                                                     mDEntryPx = 10},
                                                   #rgr_marketDataIncrementalRefresh_268{mDUpdateAction = change,
-                                                                                                    mDEntryRefID = <<"0002">>,
+                                                                                                    mDEntryRefID = "0002",
                                                                                                     mDEntryPx = 11}],
                                             standardTrailer = #standardTrailer{}},
   Nums = lists:seq(1, 15000),

@@ -54,6 +54,7 @@ getMessages(Pid, From, To) ->
 %% --------------------------------------------------------------------
 init([Pid, FixSender, SenderCompID, TargetCompID, 
       Callback, Role, SessionId]) ->
+    lager:md([{session, SessionId}]),
     State = #state{pid = Pid, fixSender = FixSender,
                    session_id = SessionId, senderCompID = SenderCompID,
                    targetCompID = TargetCompID, callback = Callback,
@@ -127,7 +128,7 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                  mnesia:dirty_read(({fix_out_messages, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(Msg));
-        _Else -> lager:debug("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),
+        _Else -> lager:notice("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),
                  M:F(Id, Msg)
     end,
     {noreply, State#state{count = C+1}}.
