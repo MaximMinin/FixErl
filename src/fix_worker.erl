@@ -23,7 +23,8 @@
         handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {callback, pid, fixSender, count = 0, 
-                senderCompID, targetCompID, role, session_id}).
+                senderCompID, targetCompID, role, session_id,
+                mnesia_tables_name}).
 
 %% ====================================================================
 %% External functions
@@ -58,7 +59,9 @@ init([Pid, FixSender, SenderCompID, TargetCompID,
     State = #state{pid = Pid, fixSender = FixSender,
                    session_id = SessionId, senderCompID = SenderCompID,
                    targetCompID = TargetCompID, callback = Callback,
-                   role = Role},
+                   role = Role,
+                   mnesia_tables_name = 
+                       fixerl_mnesia_utils:get_tables_name(SessionId)},
     {ok, State}.
 
 %% --------------------------------------------------------------------
@@ -89,9 +92,10 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                                    targetCompID = TargetCompID,
                                    count = C, callback = {M,F}, 
                                    role = Role, 
-                                   session_id = Id} = State) ->
+                                   session_id = Id,
+                                   mnesia_tables_name = {Tin,Tout}} = State) ->
     mnesia:transaction(fun() -> 
-        mnesia:write({fix_in_messages, C+1 , Msg}) end),
+        mnesia:write({Tin, C+1 , Msg}) end),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon -> lager:debug("LOGON: ~p~n", [Msg]),
@@ -124,8 +128,8 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                   erlang:exit(fix_session_close);
         resendRequest -> lager:debug("RESENDREQUEST: ~p~n", [Msg]),
             lists:map(fun(Num) -> 
-                [{fix_out_messages, Num, ResendMessage}] = 
-                 mnesia:dirty_read(({fix_out_messages, Num})),
+                [{Tout, Num, ResendMessage}] = 
+                 mnesia:dirty_read(({Tout, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(Msg));
         _Else -> lager:notice("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),

@@ -18,7 +18,9 @@
 %%
 -export([init/0]).
 
--export([ensure_mnesia_running/0, wait_for_tables/0, check_schema_integrity/0, create_tables/0]).
+-export([ensure_mnesia_running/0, wait_for_tables/0, 
+         check_schema_integrity/0, create_tables/0,
+         create_table/1, get_tables_name/1]).
 %%
 %% API Functions
 %%
@@ -29,7 +31,6 @@ init() ->
     ok = ensure_mnesia_dir(),
     create_tables(),
     wait_for_tables(),
-    ok = clear_temp_tables(),
     check_schema_integrity(),
     ok.
 
@@ -43,20 +44,6 @@ table_definitions() ->
                         {type, set},
                         {disc_copies, [node()]},
                         {attributes, record_info(fields, last_startup_run)}
-                    ]
-    },
-    {fix_in_messages, 
-                    [
-                        {type, set},
-                        {disc_copies, [node()]},
-                        {attributes, record_info(fields, fix_in_messages)}
-                    ]
-    },
-    {fix_out_messages,  
-                    [
-                        {type, set},
-                        {disc_copies, [node()]},
-                        {attributes, record_info(fields, fix_out_messages)}
                     ]
     }
     ].
@@ -72,6 +59,37 @@ create_tables() ->
                   end,
                   table_definitions()),
     ok.
+
+create_table(SessionId) ->
+    {InTableName, OutTableName} = get_tables_name(SessionId),
+    case tables_exist(InTableName, OutTableName) of
+        false ->
+            TabDef = get_table_def(),
+            {atomic, ok} = mnesia:create_table(InTableName, TabDef),
+            {atomic, ok} = mnesia:create_table(OutTableName, TabDef);
+        true -> ok
+    end.
+
+get_tables_name(SessionId)->
+    {{Y,M,D},_}=erlang:universaltime(),
+    {list_to_atom(lists:concat([SessionId,"_in_",Y,"_",M,"_",D])),
+    list_to_atom(lists:concat([SessionId,"_out_",Y,"_",M,"_",D]))}.
+
+tables_exist(InTableName, OutTableName) ->
+    try
+        mnesia:table_info(InTableName, [all]),
+        mnesia:table_info(OutTableName, [all]),
+        true
+    catch _:_ ->
+              false
+    end.
+
+get_table_def()->
+     [
+         {type, set},
+         %%{disc_copies, [node()]},
+         {attributes, [number, message]}
+     ].
 
 wait_for_tables() -> 
            case mnesia:wait_for_tables(table_names(), 30000) of
@@ -90,34 +108,6 @@ check_schema_integrity() ->
 
 table_names() ->
     [Tab || {Tab, _} <- table_definitions()].
-
-
-temp_tables() ->
-    [fix_in_messages, fix_out_messages].
-
-clear_temp_tables() ->
-    {Date, _} = erlang:universaltime(),
-    case mnesia:dirty_read(({last_startup_run, 1})) of
-    [{last_startup_run, 1, LastDate}] ->
-       case Date > LastDate of
-           true ->
-                   lists:map(fun(Tab) -> mnesia:clear_table(Tab)end, temp_tables()),
-               Res = mnesia:transaction(fun () ->
-                   mnesia:write({last_startup_run, 1, Date})
-               end),
-               io:format("CLEAR: ~p~n", [Res]),
-               ok;
-           false ->
-               ok
-       end;
-    [] ->
-        mnesia:transaction(fun () ->
-                           mnesia:write({last_startup_run, 1, Date})
-                           end),
-        ok
-    end,
-    ok.
-
 
 dir() -> mnesia:system_info(directory).
     

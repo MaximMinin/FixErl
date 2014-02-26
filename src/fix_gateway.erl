@@ -23,7 +23,8 @@
         terminate/2, code_change/3]).
 
 -record(state, {socket, count = 0, fix_version, 
-                senderCompID, targetCompID}).
+                senderCompID, targetCompID,
+                table_out_name}).
 
 %% ====================================================================
 %% External functions
@@ -39,8 +40,9 @@ resend(Pid, Message)->
 %% Server functions
 %% ====================================================================
 start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id, StartSeqNum)->
+    {_InTabel, OutTable} = fixerl_mnesia_utils:get_tables_name(Id),
     gen_server:start_link({local, Id},?MODULE, 
-        [Socket, FixVersion, SenderCompID, TargetCompID, StartSeqNum], []).
+        [Socket, FixVersion, SenderCompID, TargetCompID, OutTable, StartSeqNum], []).
 
 %% --------------------------------------------------------------------
 %% Function: init/1
@@ -50,21 +52,23 @@ start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id, StartSeqNum)->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Socket, FixVersion, SenderCompID, TargetCompID, undefined]) ->
-    case mnesia:table_info(fix_out_messages, size) of
+init([Socket, FixVersion, SenderCompID, TargetCompID, OutTable, undefined]) ->
+    case mnesia:table_info(OutTable, size) of
         C when erlang:is_integer(C) -> 
             {ok, #state{socket = Socket, count = C, 
                         fix_version = FixVersion, 
                         senderCompID = SenderCompID, 
-                        targetCompID = TargetCompID}};
+                        targetCompID = TargetCompID,
+                        table_out_name = OutTable}};
         {aborted, Reason} ->
             {stop, Reason}
     end;
-init([Socket, FixVersion, SenderCompID, TargetCompID, StartSeqNum]) ->
+init([Socket, FixVersion, SenderCompID, TargetCompID, OutTable, StartSeqNum]) ->
     {ok, #state{socket = Socket, count = StartSeqNum, 
                 fix_version = FixVersion, 
                 senderCompID = SenderCompID, 
-                targetCompID = TargetCompID}}.
+                targetCompID = TargetCompID,
+                table_out_name = OutTable}}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -89,7 +93,7 @@ handle_call(_Request, _From, State) ->
 %% --------------------------------------------------------------------
 handle_cast(send_heartbeat, #state{socket = Socket, count = Count, 
             senderCompID = SenderCompID, targetCompID = TargetCompID,
-            fix_version = FixVersion} = State) ->
+            fix_version = FixVersion, table_out_name = T} = State) ->
     try 
         NewCount = Count+1,
         Record = fix_convertor:set_msg_seqnum(fix_utils:get_heartbeat(
@@ -97,7 +101,7 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
                                         NewCount, FixVersion), 
         Bin = fix_convertor:record2fix(Record, FixVersion), 
         mnesia:transaction(fun() -> 
-            mnesia:write({fix_out_messages, NewCount , Bin}) end),
+            mnesia:write({T, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:debug("SEND HEARTBEAT: ~p", 
                     [fix_convertor:format(Record, FixVersion)])
@@ -113,7 +117,8 @@ handle_cast({resend, Bin}, #state{socket = Socket} = State) ->
     end,
     {noreply, State};
 handle_cast({send, Record}, #state{socket = Socket, count = Count, 
-                                   fix_version = FixVersion} = State)
+                                   fix_version = FixVersion,
+                                   table_out_name = T} = State)
             when erlang:is_tuple(Record) ->
     NewCount = Count+1,
 %%     try 
@@ -121,7 +126,7 @@ handle_cast({send, Record}, #state{socket = Socket, count = Count,
                                            NewCount, FixVersion), 
         Bin = fix_convertor:record2fix(NewRecord, FixVersion), 
         mnesia:transaction(fun() -> 
-            mnesia:write({fix_out_messages, NewCount , Bin}) end),
+            mnesia:write({T, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:info("FIX OUT MESSAGE -> ~p", 
                    [fix_convertor:format(NewRecord, FixVersion)]),
