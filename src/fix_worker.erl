@@ -93,7 +93,7 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                                    count = C, callback = {M,F}, 
                                    role = Role, 
                                    session_id = Id,
-                                   mnesia_tables_name = {Tin,Tout}} = State) ->
+                                   mnesia_tables_name = [Tin,Tout]} = State) ->
     mnesia:transaction(fun() -> 
         mnesia:write({Tin, C+1 , Msg}) end),
     case erlang:element(1, Msg) of

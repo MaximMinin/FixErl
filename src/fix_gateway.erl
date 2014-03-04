@@ -40,7 +40,7 @@ resend(Pid, Message)->
 %% Server functions
 %% ====================================================================
 start_link(Socket, FixVersion, SenderCompID, TargetCompID, Id, StartSeqNum)->
-    {_InTabel, OutTable} = fixerl_mnesia_utils:get_tables_name(Id),
+    [_InTabel, OutTable] = fixerl_mnesia_utils:get_tables_name(Id),
     gen_server:start_link({local, Id},?MODULE, 
         [Socket, FixVersion, SenderCompID, TargetCompID, OutTable, StartSeqNum], []).
 

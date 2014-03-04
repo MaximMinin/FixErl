@@ -37,12 +37,16 @@ end}}.
 stop(_Args) ->
 application:stop(fixerl),
 application:stop(mnesia),
+lager:notice("DIR:~p", [file:get_cwd()]),
 application:stop(lager).
 
 start_sessions() ->
+net_kernel:start([fixerl, shortnames]),
+mnesia:delete_schema([node()|nodes()]),
+mnesia:create_schema([node()|nodes()]),
 lager:start(),
 lager:set_loglevel(lager_console_backend, notice),
-application:start(mnesia),
+fixerl_mnesia_utils:init(),
 Ret = application:start(fixerl),
 S1 = #session_parameter{
                              id = test1, 
@@ -98,7 +102,7 @@ receiver(0) ->
      M -> lager:notice("START: ~p", [erlang:now()]),
            receiver(1, erlang:now())
   end.
-receiver(10000, StartTime) ->
+receiver(1000, StartTime) ->
   receive
      M -> 
 EndTime = erlang:now(),
