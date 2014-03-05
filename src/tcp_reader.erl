@@ -107,7 +107,8 @@ start_connection(Parent, Deb, ClientSock, Session) ->
                                                 ),
         case Session#session_parameter.role of
             initiator ->
-                        fix_gateway:send(WriterPid, fix_utils:get_logon(Session#session_parameter.senderCompId,
+                        fix_gateway:send(WriterPid, fix_utils:get_logon(Session#session_parameter.fix_version,
+                                                        Session#session_parameter.senderCompId,
                                                         Session#session_parameter.targetCompId));
             _Else -> ok
         end,
@@ -207,7 +208,8 @@ switch_callback(OldState, NewCallback, Length) ->
 
 handle_input_fix(handshake, Data,
              State = #state{session_par = Session, sock = Sock, connection = Connection, writer = WriterPid}) ->
-    {ok, FixPid} = fix_worker:start_link(self(), WriterPid, 
+    {ok, FixPid} = fix_worker:start_link(self(), WriterPid,
+                                         Session#session_parameter.fix_version,
                                          Session#session_parameter.senderCompId, 
                                          Session#session_parameter.targetCompId,
                                          Session#session_parameter.callbackModule,

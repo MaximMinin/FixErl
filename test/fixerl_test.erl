@@ -102,7 +102,7 @@ receiver(0) ->
      M -> lager:notice("START: ~p", [erlang:now()]),
            receiver(1, erlang:now())
   end.
-receiver(1000, StartTime) ->
+receiver(10000, StartTime) ->
   receive
      M -> 
 EndTime = erlang:now(),

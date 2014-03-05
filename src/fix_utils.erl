@@ -12,13 +12,15 @@
 %%
 %% Include files
 %%
--include_lib("fix_convertor/include/FIX_4_2.hrl").
+
 %%
 %% Exported Functions
 %%
--export([get_logon/2, get_heartbeat/2, get_heartbeat/1,
-         get_numbers/1, getNow/0, getNow/1, getUniq/0,
-         check_logon/3, get_logout/2]).
+-export([get_logon/3, get_logout/3,
+         check_logon/4, 
+         get_heartbeat/3, get_heartbeat/2,
+         get_numbers/2, 
+         getNow/0, getNow/1, getUniq/0]).
 
 %% ====================================================================
 %% API Functions
@@ -32,11 +34,23 @@
 %%                 TargetCompID::binary()) -> ok|nok
 %% @end
 %% --------------------------------------------------------------------
-check_logon(#logon{standardHeader = #standardHeader{
-                senderCompID = TargetCompID, 
-                targetCompID = SenderCompID}},
-            SenderCompID, TargetCompID) -> ok;
-check_logon(_,_,_) -> nok.
+check_logon(FixVersion, Logon,
+            SenderCompID, TargetCompID) -> 
+    Utils = fix_convertor:get_util_module(FixVersion),
+    
+    Header = erlang:element(2, Logon),
+    D = Utils:get_record_def(standardHeader),
+    P1 = find_first(targetCompID, D),
+    TargetId = erlang:element(P1, Header),
+    P2 = find_first(senderCompID, D),
+    SenderID = erlang:element(P2, Header),
+    case TargetId == SenderCompID andalso
+             SenderID == TargetCompID of
+        true ->
+            ok;
+        false ->
+            nok
+    end.
 
 
 %% --------------------------------------------------------------------
@@ -46,15 +60,19 @@ check_logon(_,_,_) -> nok.
 %%                 TargetCompID::binary()) -> #logout{}
 %% @end
 %% --------------------------------------------------------------------
-get_logout(SenderCompID, TargetCompID) ->
-    #logout{standardHeader = #standardHeader{
-                msgType = logout,
-                sendingTime = ?MODULE:getNow(),
-                senderCompID = SenderCompID, 
-                targetCompID = TargetCompID},
-           standardTrailer = #standardTrailer{}}.
-
-
+get_logout(FixVersion, SenderCompID, TargetCompID) ->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:getRecord(logout),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(logout, standardHeader,
+                           Utils:setFieldInRecord(logout, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           logout), ?MODULE:getNow()), TargetCompID)).
 %% --------------------------------------------------------------------
 %% @doc Gets the logon message
 %%
@@ -62,16 +80,22 @@ get_logout(SenderCompID, TargetCompID) ->
 %%                 TargetCompID::binary()) -> #logon{}
 %% @end
 %% --------------------------------------------------------------------
-get_logon(SenderCompID, TargetCompID) ->
-    #logon{standardHeader = #standardHeader{
-                msgType = logon,
-                sendingTime = ?MODULE:getNow(),
-                senderCompID = SenderCompID, 
-                targetCompID = TargetCompID},
-           encryptMethod = none, %%TODO
-           standardTrailer = #standardTrailer{},
-           rgr_logon_384 = [#rgr_logon_384{}],
-           heartBtInt = 30}.
+get_logon(FixVersion, SenderCompID, TargetCompID) ->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:getRecord(logon),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(logon, heartBtInt,
+    Utils:setFieldInRecord(logon, encryptMethod,
+    Utils:setFieldInRecord(logon, standardHeader,
+                           Utils:setFieldInRecord(logon, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           logon), ?MODULE:getNow()), TargetCompID)),
+                           none), 30).
 
 %% --------------------------------------------------------------------
 %% @doc Gets the heartbeat message
@@ -80,14 +104,22 @@ get_logon(SenderCompID, TargetCompID) ->
 %%                     TargetCompID::binary()) -> #hearbeat{}
 %% @end
 %% --------------------------------------------------------------------
-get_heartbeat(SenderCompID, TargetCompID)->
-    #heartbeat{testReqID = ?MODULE:getUniq(),
-               standardHeader = #standardHeader{
-                    msgType = heartbeat,
-                    sendingTime = ?MODULE:getNow(),
-                    senderCompID = SenderCompID,
-                    targetCompID = TargetCompID},
-                standardTrailer = #standardTrailer{}}.
+get_heartbeat(FixVersion, SenderCompID, TargetCompID)->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:getRecord(heartbeat),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(heartbeat,testReqID,
+    Utils:setFieldInRecord(heartbeat, standardHeader,
+                           Utils:setFieldInRecord(heartbeat, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           heartbeat), ?MODULE:getNow()),
+                           TargetCompID)),
+                           ?MODULE:getUniq()).
 
 %% --------------------------------------------------------------------
 %% @doc Gets the heartbeat message
@@ -96,18 +128,34 @@ get_heartbeat(SenderCompID, TargetCompID)->
 %%
 %% @end
 %% --------------------------------------------------------------------
-get_heartbeat(#testRequest{standardHeader = #standardHeader{
-                                targetCompID = TargetCompID,
-                                senderCompID = SenderCompID},
-                           testReqID = TestReqID})->
-    #heartbeat{testReqID = TestReqID,
-               standardHeader = #standardHeader{
-                    msgType = heartbeat,
-                    sendingTime = ?MODULE:getNow(),
-                    senderCompID = TargetCompID,
-                    targetCompID = SenderCompID},
-                standardTrailer = #standardTrailer{}}.
-
+get_heartbeat(FixVersion, TestRequest)->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    D1 = Utils:get_record_def(testRequest),
+    P1 = find_first(testReqID, D1),
+    TestReqID = erlang:element(P1, TestRequest),
+    
+    Header = erlang:element(2, TestRequest),
+    D2 = Utils:get_record_def(standardHeader),
+    P2 = find_first(targetCompID, D2),
+    TargetCompID = erlang:element(P2, Header),
+    P3 = find_first(senderCompID, D2),
+    SenderCompID = erlang:element(P3, Header),
+    
+    L = Utils:getRecord(heartbeat),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(heartbeat,testReqID,
+    Utils:setFieldInRecord(heartbeat, standardHeader,
+                           Utils:setFieldInRecord(heartbeat, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           heartbeat), ?MODULE:getNow()),
+                           TargetCompID)),
+                           TestReqID).
+    
 %% --------------------------------------------------------------------
 %% @doc Gets the list of message numbers to be resend
 %%
@@ -115,8 +163,13 @@ get_heartbeat(#testRequest{standardHeader = #standardHeader{
 %%
 %% @end
 %% --------------------------------------------------------------------
-get_numbers(#resendRequest{beginSeqNo=Start, endSeqNo = End})->
-    lists:seq(Start, End).
+get_numbers(FixVersion, ResendRequest)->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:get_record_def(resendRequest),
+    P1 = find_first(beginSeqNo, L),
+    P2 = find_first(endSeqNo, L),
+    lists:seq(erlang:element(P1, ResendRequest),
+              erlang:element(P2, ResendRequest)).
     
 %% --------------------------------------------------------------------
 %% @doc Gets timestamp (now + AddTimeInSec) in fix format 
@@ -181,4 +234,14 @@ getTwoDigits(Int) when Int < 10 ->
     lists:concat(["0",Int]);
 getTwoDigits(Int) ->
     erlang:integer_to_list(Int).
+
+find_first(Element, List) when is_list(List) ->
+    find_first(Element, List, 0).
+
+find_first(_Element, [], Inc) when is_integer(Inc) ->
+    Inc + 1;
+find_first(Element, [Element | _Tail], Inc) when is_integer(Inc) ->
+    Inc + 1;
+find_first(Element, [_ | Tail], Inc) when is_integer(Inc) ->
+    find_first(Element, Tail, Inc + 1).
 

@@ -96,7 +96,7 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
             fix_version = FixVersion, table_out_name = T} = State) ->
     try 
         NewCount = Count+1,
-        Record = fix_convertor:set_msg_seqnum(fix_utils:get_heartbeat(
+        Record = fix_convertor:set_msg_seqnum(fix_utils:get_heartbeat(FixVersion,
                                         SenderCompID, TargetCompID), 
                                         NewCount, FixVersion), 
         Bin = fix_convertor:record2fix(Record, FixVersion), 

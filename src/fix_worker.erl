@@ -16,7 +16,7 @@
 -include("fixerl.hrl").
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/7, newMessage/2, getMessages/3]).
+-export([start_link/8, newMessage/2, getMessages/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, 
@@ -24,14 +24,14 @@
 
 -record(state, {callback, pid, fixSender, count = 0, 
                 senderCompID, targetCompID, role, session_id,
-                mnesia_tables_name}).
+                mnesia_tables_name, fix_version}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Pid, FixSender, SenderCompID,
+start_link(Pid, FixSender, FixVersion, SenderCompID,
             TargetCompID, Callback, Role, SessionId) ->
-    gen_server:start_link(?MODULE, [Pid, FixSender, SenderCompID, 
+    gen_server:start_link(?MODULE, [Pid, FixSender, FixVersion, SenderCompID, 
                                     TargetCompID, Callback, 
                                     Role, SessionId], []).
 
@@ -53,10 +53,11 @@ getMessages(Pid, From, To) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Pid, FixSender, SenderCompID, TargetCompID, 
+init([Pid, FixSender, FixVersion, SenderCompID, TargetCompID, 
       Callback, Role, SessionId]) ->
     lager:md([{session, SessionId}]),
-    State = #state{pid = Pid, fixSender = FixSender,
+    State = #state{fix_version = FixVersion,
+                   pid = Pid, fixSender = FixSender,
                    session_id = SessionId, senderCompID = SenderCompID,
                    targetCompID = TargetCompID, callback = Callback,
                    role = Role,
@@ -88,6 +89,7 @@ handle_call(_Request, _From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender, 
+                                   fix_version = FixVersion,
                                    senderCompID = SenderCompID, 
                                    targetCompID = TargetCompID,
                                    count = C, callback = {M,F}, 
@@ -98,40 +100,46 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
         mnesia:write({Tin, C+1 , Msg}) end),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
-        logon -> lager:debug("LOGON: ~p~n", [Msg]),
-            case fix_utils:check_logon(Msg, 
+        logon -> lager:debug("LOGON: ~p SenderCompID: ~p TargetCompID: ~p", 
+                            [Msg, SenderCompID, TargetCompID]),
+            case fix_utils:check_logon(FixVersion,
+                                       Msg, 
                                        SenderCompID, 
                                        TargetCompID) of
                 ok -> 
                     case Role of
                         acceptor ->
                             fix_gateway:send(FixSender,
-                                    fix_utils:get_logon(SenderCompID,
+                                    fix_utils:get_logon(FixVersion,
+                                                        SenderCompID,
                                                        TargetCompID));
                         initiator -> ok
                     end,
                     Pid ! fix_starting;
                 nok -> 
                     fix_gateway:send(FixSender,
-                        fix_utils:get_logout(SenderCompID,
-                                              TargetCompID)),
+                        fix_utils:get_logout(FixVersion,
+                                            SenderCompID,
+                                            TargetCompID)),
                     erlang:exit(false_logon)
             end;
         testRequest -> lager:debug("TESTREQUEST: ~p~n", [Msg]),
                   fix_gateway:send(FixSender,
-                                        fix_utils:get_heartbeat(Msg));
+                                        fix_utils:get_heartbeat(FixVersion,
+                                                                Msg));
         heartbeat -> lager:debug("HEARTBEAT: ~p~n", [Msg]);
         logout -> lager:debug("LOGOUT: ~p~n", [Msg]), 
                   fix_gateway:send(FixSender,
-                      fix_utils:get_logout(SenderCompID,
-                                            TargetCompID)),
+                      fix_utils:get_logout(FixVersion,
+                                           SenderCompID,
+                                           TargetCompID)),
                   erlang:exit(fix_session_close);
         resendRequest -> lager:debug("RESENDREQUEST: ~p~n", [Msg]),
             lists:map(fun(Num) -> 
                 [{Tout, Num, ResendMessage}] = 
                  mnesia:dirty_read(({Tout, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
-                 fix_utils:get_numbers(Msg));
+                 fix_utils:get_numbers(FixVersion, Msg));
         _Else -> lager:notice("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),
                  M:F(Id, Msg)
     end,
