@@ -41,15 +41,17 @@ create_table(SessionId) ->
         case tables_exist(TableName) of
             false ->
                 TabDef = get_table_def(),
-                {atomic, ok} = mnesia:create_table(TableName, TabDef),
-                {atomic, ok} = mnesia:change_table_copy_type(TableName,
+                try
+                    {atomic, ok} = mnesia:create_table(TableName, TabDef),
+                    {atomic, ok} = mnesia:change_table_copy_type(TableName,
                                                              node(),
                                                              disc_copies),
-                lists:map(fun(Node) -> mnesia:add_table_copy(TableName,
+                    lists:map(fun(Node) -> mnesia:add_table_copy(TableName,
                                                              Node,
                                                              disc_copies)
                           end, nodes()),
-                wait_for_table(TableName);
+                    wait_for_table(TableName)
+                catch _:_ -> ok end;
         true -> ok
         end end, Ts).
 
