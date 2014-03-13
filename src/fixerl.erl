@@ -41,8 +41,6 @@ start() ->
 %% @end
 %% --------------------------------------------------------------------
 start_session(SessionParams) ->
-    Id = SessionParams#session_parameter.id,
-    fixerl_mnesia_utils:create_table(Id),
     fixerl_root_sup:start_session(SessionParams).
 
 %% --------------------------------------------------------------------
