@@ -55,4 +55,4 @@ start_child(Id, Arg) ->
 init([Session]) ->
     {ok, {{simple_one_for_one, 10, 10},
           [{tcp_client, {tcp_reader,start_link,[Session]},
-            temporary, brutal_kill, worker, [tcp_reader]}]}}.
+            permanent, brutal_kill, worker, [tcp_reader]}]}}.
