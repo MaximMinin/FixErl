@@ -16,7 +16,8 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/6, send/2, resend/2, send_heartbeat/1]).
+-export([start_link/6, send/2, send/3, 
+         resend/2, send_heartbeat/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
@@ -30,7 +31,9 @@
 %% External functions
 %% ====================================================================
 send(Pid, Message)->
-    gen_server:cast(Pid, {send, Message}).
+    gen_server:cast(Pid, {send, Message, <<>>}).
+send(Pid, Message, NotStandardPart)->
+    gen_server:cast(Pid, {send, Message, NotStandardPart}).
 send_heartbeat(Pid)->
     gen_server:cast(Pid, send_heartbeat).
 resend(Pid, Message)->
@@ -94,8 +97,8 @@ handle_call(_Request, _From, State) ->
 handle_cast(send_heartbeat, #state{socket = Socket, count = Count, 
             senderCompID = SenderCompID, targetCompID = TargetCompID,
             fix_version = FixVersion, table_out_name = T} = State) ->
+    NewCount = Count+1,
     try 
-        NewCount = Count+1,
         Record = fix_convertor:set_msg_seqnum(fix_utils:get_heartbeat(FixVersion,
                                         SenderCompID, TargetCompID), 
                                         NewCount, FixVersion), 
@@ -108,7 +111,7 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
     catch error:Error -> 
             lager:error("~p", [Error])
     end,
-    {noreply, State};
+    {noreply, State#state{count = NewCount}};
 handle_cast({resend, Bin}, #state{socket = Socket} = State) ->
     try 
         gen_tcp:send(Socket, Bin)
@@ -116,7 +119,8 @@ handle_cast({resend, Bin}, #state{socket = Socket} = State) ->
             lager:error("~p", [Error])
     end,
     {noreply, State};
-handle_cast({send, Record}, #state{socket = Socket, count = Count, 
+handle_cast({send, Record, NotStandardPart}, 
+            #state{socket = Socket, count = Count, 
                                    fix_version = FixVersion,
                                    table_out_name = T} = State)
             when erlang:is_tuple(Record) ->
@@ -124,7 +128,9 @@ handle_cast({send, Record}, #state{socket = Socket, count = Count,
 %%     try 
         NewRecord = fix_convertor:set_msg_seqnum(Record, 
                                            NewCount, FixVersion), 
-        Bin = fix_convertor:record2fix(NewRecord, FixVersion), 
+        Bin = fix_convertor:record2fix(NewRecord, 
+                                       NotStandardPart,
+                                       FixVersion), 
         mnesia:transaction(fun() -> 
             mnesia:write({T, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),

@@ -32,7 +32,7 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Id, undefined, Port, undefined, undefined) ->
+start_link(Id, undefined, Port, _MaxReconnect, _ReconnectTimeout) ->
     supervisor:start_link({local, 
         list_to_atom(lists:concat([Id, "_", ?MODULE]))},
         ?MODULE, {Port, Id});
