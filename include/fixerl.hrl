@@ -5,7 +5,7 @@
                              max_reconnect :: non_neg_integer(),
                              reconnect_interval :: non_neg_integer(), 
                              role :: 'acceptor' | 'initiator',
-                             callback :: {Module :: atom(), Function :: atom},
+                             callback :: {Module :: atom(), Function :: atom()},
                              callback_mode :: standard | all,
                              fix_version :: fix_version(),
                              start_seqnum :: pos_integer(),
