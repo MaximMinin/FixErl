@@ -54,6 +54,15 @@ getMessages(Pid, From, To) ->
 init([Pid, FixSender, Session]) ->
     Id = Session#session_parameter.id,
     lager:md([{session, Id}]),
+    {{Y,M,D},_} = erlang:universaltime(),
+    lager:trace_file(lists:concat(["log/session_business_in_log_",
+                                   Id,"_",Y,M,D,".info"]),
+                                  [{session, Id}, {fix_worker, in},
+                                   {type, business}], info),
+    lager:trace_file(lists:concat(["log/session_tech_in_log_",
+                                   Id,"_",Y,M,D,".info"]),
+                                  [{session, Id}, {fix_worker, in},
+                                   {type, tech}], info),
     State = #state{fix_version = Session#session_parameter.fix_version,
                    pid = Pid, 
                    fixSender = FixSender,
@@ -104,8 +113,10 @@ handle_cast({message, {Msg, NotStandardFields}},
         mnesia:write({Tin, C+1 , Msg}) end),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
-        logon -> lager:debug("LOGON: ~p SenderCompID: ~p TargetCompID: ~p", 
-                            [Msg, SenderCompID, TargetCompID]),
+        logon -> 
+            info_tech(Id, "LOGON: ~p SenderCompID: ~p TargetCompID: ~p", 
+                      [fix_convertor:format(Msg, FixVersion),
+                       SenderCompID, TargetCompID]),
             case fix_utils:check_logon(FixVersion,
                                        Msg, 
                                        SenderCompID, 
@@ -127,24 +138,30 @@ handle_cast({message, {Msg, NotStandardFields}},
                                             TargetCompID)),
                     erlang:exit(false_logon)
             end;
-        testRequest -> lager:debug("TESTREQUEST: ~p~n", [Msg]),
-                  fix_gateway:send(FixSender,
-                                        fix_utils:get_heartbeat(FixVersion,
-                                                                Msg));
-        heartbeat -> lager:debug("HEARTBEAT: ~p~n", [Msg]);
-        logout -> lager:debug("LOGOUT: ~p~n", [Msg]), 
+        testRequest -> 
+            info_tech(Id, "TESTREQUEST: ~p", [fix_convertor:format(Msg, FixVersion)]),
+            fix_gateway:send(FixSender,
+                             fix_utils:get_heartbeat(FixVersion,
+                                                     Msg));
+        heartbeat -> info_tech(Id, "HEARTBEAT: ~p", [fix_convertor:format(Msg, FixVersion)]);
+        logout -> info_tech(Id, "LOGOUT: ~p", [fix_convertor:format(Msg, FixVersion)]), 
                   fix_gateway:send(FixSender,
                       fix_utils:get_logout(FixVersion,
                                            SenderCompID,
                                            TargetCompID)),
                   erlang:exit(fix_session_close);
-        resendRequest -> lager:debug("RESENDREQUEST: ~p~n", [Msg]),
+        resendRequest -> info_tech(Id, "RESENDREQUEST: ~p", [fix_convertor:format(Msg, FixVersion)]),
             lists:map(fun(Num) -> 
                 [{Tout, Num, ResendMessage}] = 
                  mnesia:dirty_read(({Tout, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(FixVersion, Msg));
-        _Else -> lager:notice("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),
+        _Else -> lager:info([{session, Id},
+                             {fix_worker, in}, 
+                             {type, business}
+                             ],
+                            "MESSAGE: ~p",
+                            [fix_convertor:format(Msg, FixVersion)]),
                  case Mode of
                      all -> 
                          M:F(Id, Msg, NotStandardFields);
@@ -183,3 +200,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
+info_tech(Id, FormatString, Args) ->
+    lager:info([{session, Id}, {fix_worker, in}, {type, tech}],
+               FormatString, Args).

@@ -83,7 +83,9 @@ lager:info("sender"),
                                                                                                     mDEntryPx = 11}],
                                             standardTrailer = #standardTrailer{}},
   Nums = lists:seq(1, 10001),
-  lists:map(fun(_X) -> fix_gateway:send(test1, RecA) end, Nums),
+  lists:map(fun(_X) -> timer:sleep(10),
+                       fix_gateway:send(test1, RecA) end, Nums),
+  timer:sleep(2000),
 true.
 
 callback(_Id, M) ->
