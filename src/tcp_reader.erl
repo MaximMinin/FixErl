@@ -208,13 +208,7 @@ switch_callback(OldState, NewCallback, Length) ->
 
 handle_input_fix(handshake, Data,
              State = #state{session_par = Session, sock = Sock, connection = Connection, writer = WriterPid}) ->
-    {ok, FixPid} = fix_worker:start_link(self(), WriterPid,
-                                         Session#session_parameter.fix_version,
-                                         Session#session_parameter.senderCompId, 
-                                         Session#session_parameter.targetCompId,
-                                         Session#session_parameter.callbackModule,
-                                         Session#session_parameter.role,
-                                         Session#session_parameter.id),
+    {ok, FixPid} = fix_worker:start_link(self(), WriterPid, Session),
     {ok, Splitter} = fix_splitter:start_link(FixPid, Session#session_parameter.fix_version), 
     fix_splitter:newRowData(Splitter, Data),
     fix_heartbeat:start_heartbeat(Sock, WriterPid, Session#session_parameter.heartbeatInterval),

@@ -16,7 +16,7 @@
 -include("fixerl.hrl").
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/8, newMessage/2, getMessages/3]).
+-export([start_link/3, newMessage/2, getMessages/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, 
@@ -24,16 +24,14 @@
 
 -record(state, {callback, pid, fixSender, count = 0, 
                 senderCompID, targetCompID, role, session_id,
-                mnesia_tables_name, fix_version}).
+                mnesia_tables_name, fix_version, mode}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Pid, FixSender, FixVersion, SenderCompID,
-            TargetCompID, Callback, Role, SessionId) ->
-    gen_server:start_link(?MODULE, [Pid, FixSender, FixVersion, SenderCompID, 
-                                    TargetCompID, Callback, 
-                                    Role, SessionId], []).
+start_link(Pid, FixSender, Session) ->
+    gen_server:start_link(?MODULE, [Pid, FixSender, 
+                                    Session], []).
 
 newMessage(Pid, Message)->
     gen_server:cast(Pid, {message, Message}).
@@ -53,16 +51,20 @@ getMessages(Pid, From, To) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Pid, FixSender, FixVersion, SenderCompID, TargetCompID, 
-      Callback, Role, SessionId]) ->
-    lager:md([{session, SessionId}]),
-    State = #state{fix_version = FixVersion,
-                   pid = Pid, fixSender = FixSender,
-                   session_id = SessionId, senderCompID = SenderCompID,
-                   targetCompID = TargetCompID, callback = Callback,
-                   role = Role,
+init([Pid, FixSender, Session]) ->
+    Id = Session#session_parameter.id,
+    lager:md([{session, Id}]),
+    State = #state{fix_version = Session#session_parameter.fix_version,
+                   pid = Pid, 
+                   fixSender = FixSender,
+                   session_id = Id, 
+                   senderCompID = Session#session_parameter.senderCompId,
+                   targetCompID = Session#session_parameter.targetCompId, 
+                   callback = Session#session_parameter.callback,
+                   role = Session#session_parameter.role,
+                   mode = Session#session_parameter.callback_mode,
                    mnesia_tables_name = 
-                       fixerl_mnesia_utils:get_tables_name(SessionId)},
+                       fixerl_mnesia_utils:get_tables_name(Id)},
     {ok, State}.
 
 %% --------------------------------------------------------------------
@@ -88,13 +90,15 @@ handle_call(_Request, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender, 
+handle_cast({message, {Msg, NotStandardFields}}, 
+             #state{pid = Pid, fixSender = FixSender, 
                                    fix_version = FixVersion,
                                    senderCompID = SenderCompID, 
                                    targetCompID = TargetCompID,
                                    count = C, callback = {M,F}, 
                                    role = Role, 
                                    session_id = Id,
+                                   mode = Mode,
                                    mnesia_tables_name = [Tin,Tout]} = State) ->
     mnesia:transaction(fun() -> 
         mnesia:write({Tin, C+1 , Msg}) end),
@@ -141,7 +145,12 @@ handle_cast({message, Msg}, #state{pid = Pid, fixSender = FixSender,
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(FixVersion, Msg));
         _Else -> lager:notice("BUSINESS MESSAGE RECEIVED: ~p~n", [Msg]),
-                 M:F(Id, Msg)
+                 case Mode of
+                     all -> 
+                         M:F(Id, Msg, NotStandardFields);
+                     _Standard ->
+                         M:F(Id, Msg)
+                 end
     end,
     {noreply, State#state{count = C+1}}.
 

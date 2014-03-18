@@ -53,7 +53,7 @@ S1 = #session_parameter{
                              port = 12345,  
                              senderCompId = "TEST1", targetCompId = "TEST", fix_version = 'FIX 4.2',
                              heartbeatInterval = 30, role = acceptor,
-                             callbackModule = {?MODULE, callback1}
+                             callback = {?MODULE, callback1}
                            },
 fixerl:start_session(S1),
 S = #session_parameter{
@@ -61,7 +61,7 @@ S = #session_parameter{
                              host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
                              senderCompId = "TEST", targetCompId = "TEST1", fix_version = 'FIX 4.2',
                              heartbeatInterval = 30, role = initiator,
-                             callbackModule = {?MODULE, callback}
+                             callback = {?MODULE, callback}
                            },
 fixerl:start_session(S),
 Ret.
@@ -82,7 +82,7 @@ lager:info("sender"),
                                                                                                     mDEntryRefID = "0002",
                                                                                                     mDEntryPx = 11}],
                                             standardTrailer = #standardTrailer{}},
-  Nums = lists:seq(1, 15000),
+  Nums = lists:seq(1, 10001),
   lists:map(fun(_X) -> fix_gateway:send(test1, RecA) end, Nums),
 true.
 

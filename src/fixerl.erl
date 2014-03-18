@@ -16,7 +16,8 @@
 %%
 %% Exported Functions
 %%
--export([start/0, start_session/1, stop_session/1, send/2]).
+-export([start/0, start_session/1, stop_session/1, 
+         send/2, send/3]).
 
 %% ====================================================================
 %% API Functions
@@ -62,3 +63,15 @@ stop_session(SessionId) ->
 %% --------------------------------------------------------------------
 send(SessionId, Msg) ->
     fix_gateway:send(SessionId, Msg).
+
+%% --------------------------------------------------------------------
+%% @doc Send the message 
+%%
+%% @spec send(SessionId::atom(), 
+%%             NotStandardPart::binary(),
+%%             Msg::tuple()) -> ok 
+%%
+%% @end
+%% --------------------------------------------------------------------
+send(SessionId, Msg, NotStandardPart) ->
+    fix_gateway:send(SessionId, Msg, NotStandardPart).
