@@ -25,7 +25,7 @@
 
 -record(state, {socket, count = 0, fix_version, 
                 senderCompID, targetCompID,
-                table_out_name}).
+                table_out_name, id}).
 
 %% ====================================================================
 %% External functions
@@ -46,8 +46,9 @@ start_link(Socket, FixVersion,
            SenderCompID, TargetCompID, Id, StartSeqNum)->
     [_InTabel, OutTable] = fixerl_mnesia_utils:get_tables_name(Id),
     gen_server:start_link({local, Id},?MODULE, 
-        [Socket, FixVersion, SenderCompID, 
-         TargetCompID, OutTable, StartSeqNum, Id], []).
+        [Socket, FixVersion, 
+         SenderCompID, TargetCompID, 
+         OutTable, StartSeqNum, Id], []).
 
 %% --------------------------------------------------------------------
 %% Function: init/1
@@ -60,26 +61,28 @@ start_link(Socket, FixVersion,
 init([Socket, FixVersion, 
       SenderCompID, TargetCompID, 
       OutTable, undefined, Id]) ->
-    set_lager_meta_info(Id), 
+    set_lager_meta_info(Id),
     case mnesia:table_info(OutTable, size) of
         C when erlang:is_integer(C) -> 
             {ok, #state{socket = Socket, count = C, 
                         fix_version = FixVersion, 
                         senderCompID = SenderCompID, 
                         targetCompID = TargetCompID,
-                        table_out_name = OutTable}};
+                        table_out_name = OutTable,
+                        id = Id}};
         {aborted, Reason} ->
             {stop, Reason}
     end;
 init([Socket, FixVersion, 
       SenderCompID, TargetCompID, 
       OutTable, StartSeqNum, Id]) ->
-    set_lager_meta_info(Id), 
+    set_lager_meta_info(Id),
     {ok, #state{socket = Socket, count = StartSeqNum, 
                 fix_version = FixVersion, 
                 senderCompID = SenderCompID, 
                 targetCompID = TargetCompID,
-                table_out_name = OutTable}}.
+                table_out_name = OutTable,
+                id = Id}}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -104,7 +107,8 @@ handle_call(_Request, _From, State) ->
 %% --------------------------------------------------------------------
 handle_cast(send_heartbeat, #state{socket = Socket, count = Count, 
             senderCompID = SenderCompID, targetCompID = TargetCompID,
-            fix_version = FixVersion, table_out_name = T} = State) ->
+            fix_version = FixVersion, table_out_name = T, id = Id} 
+           = State) ->
     NewCount = Count+1,
     try 
         Record = fix_convertor:set_msg_seqnum(fix_utils:get_heartbeat(FixVersion,
@@ -114,7 +118,8 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
         mnesia:transaction(fun() -> 
             mnesia:write({T, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
-        lager:info([{type, tech}], "SEND HEARTBEAT: ~p", 
+        lager:info([{session, Id}, 
+                    {type, out}], "SEND HEARTBEAT: ~p", 
                     [fix_convertor:format(Record, FixVersion)])
     catch error:Error -> 
             lager:error("~p", [Error])
@@ -129,8 +134,9 @@ handle_cast({resend, Bin}, #state{socket = Socket} = State) ->
     {noreply, State};
 handle_cast({send, Record, NotStandardPart}, 
             #state{socket = Socket, count = Count, 
-                                   fix_version = FixVersion,
-                                   table_out_name = T} = State)
+                   fix_version = FixVersion,
+                   table_out_name = T,
+                   id = Id} = State)
             when erlang:is_tuple(Record) ->
     NewCount = Count+1,
     NewRecord = fix_convertor:set_msg_seqnum(Record, 
@@ -141,7 +147,8 @@ handle_cast({send, Record, NotStandardPart},
     mnesia:transaction(fun() -> 
         mnesia:write({T, NewCount , Bin}) end),
     gen_tcp:send(Socket, Bin),
-    lager:info([{type, business}], "FIX OUT MESSAGE -> ~p", 
+    lager:info([{session, Id}, 
+                {type, out}], "FIX OUT MESSAGE: ~p", 
                [fix_convertor:format(NewRecord, FixVersion)]),
     {noreply, State#state{count = NewCount}};
 handle_cast(_Msg, State) ->
@@ -177,14 +184,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %% --------------------------------------------------------------------
 set_lager_meta_info(Id)->
-    lager:md([{session, Id}, {fix_gateway, out}]),
+    lager:md([{session, Id}]),
     {{Y,M,D},_} = erlang:universaltime(),
-    lager:trace_file(lists:concat(["log/session_business_out_log_",
-                                   Id,"_",Y,M,D,".info"]),
-                                  [{session, Id},{fix_gateway, out},
-                                   {type, business}], info),
-    lager:trace_file(lists:concat(["log/session_tech_out_log_",
-                                   Id,"_",Y,M,D,".info"]),
-                                  [{session, Id},{fix_gateway, out},
-                                   {type, tech}], info).
-    
+    lager:trace_file(lists:concat(["log/session_",Id,"_out_",
+                                   Y,M,D,".log"]),
+                                  [{session, Id},
+                                   {type, out}], info).
+ 

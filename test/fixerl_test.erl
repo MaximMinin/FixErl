@@ -84,7 +84,7 @@ lager:info("sender"),
                                             standardTrailer = #standardTrailer{}},
   Nums = lists:seq(1, 10001),
   lists:map(fun(_X) -> timer:sleep(10),
-                       fix_gateway:send(test1, RecA) end, Nums),
+                       fixerl:send(test1, RecA) end, Nums),
   timer:sleep(2000),
 true.
 

@@ -122,7 +122,11 @@ split([E|[]], Last, ToReturn) ->
             {binary:list_to_bin(Rest), 
             [binary:list_to_bin([Last,<<"10=">>,Int,<<1>>])|ToReturn]}
     end;
-split([E|Liste], Last, ToReturn) ->
+split([E|Liste], L, ToReturn) ->
+    Last = case L of
+        L when is_binary(L) -> L;
+        L when is_list(L) -> [L1] = L, L1
+    end,
     [Int|Rest] =  binary:split(E, <<1>>),
     CheckSum = lists:sum(erlang:binary_to_list(Last)) rem 256,
     case CheckSum == list_to_integer(binary_to_list(Int)) of
