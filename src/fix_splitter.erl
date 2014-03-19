@@ -73,9 +73,7 @@ handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid,
     {Broken, Messages} = split(binary:list_to_bin([Last, Data])),
     lists:map(fun(M) ->  
       try Rec = fix_convertor:fix2record(M, FixVersion),
-          fix_worker:newMessage(ClientPid, Rec),
-          lager:info("FIX IN MESSAGE <- ~p", 
-                    [fix_convertor:format(Rec, FixVersion)])
+          fix_worker:newMessage(ClientPid, Rec)
      catch error:Error -> 
             lager:error("~p - MESSAGE CAN NOT BE INTERPRETED: ~p~n",
                         [M, Error])
@@ -124,7 +122,11 @@ split([E|[]], Last, ToReturn) ->
             {binary:list_to_bin(Rest), 
             [binary:list_to_bin([Last,<<"10=">>,Int,<<1>>])|ToReturn]}
     end;
-split([E|Liste], Last, ToReturn) ->
+split([E|Liste], L, ToReturn) ->
+    Last = case L of
+        L when is_binary(L) -> L;
+        L when is_list(L) -> [L1] = L, L1
+    end,
     [Int|Rest] =  binary:split(E, <<1>>),
     CheckSum = lists:sum(erlang:binary_to_list(Last)) rem 256,
     case CheckSum == list_to_integer(binary_to_list(Int)) of
