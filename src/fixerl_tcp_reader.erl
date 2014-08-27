@@ -7,7 +7,7 @@
 %%% Created : 28.06.2012
 %%% @end
 %%% -------------------------------------------------------------------
--module(tcp_reader).
+-module(fixerl_tcp_reader).
 
 -include("fixerl.hrl").
 

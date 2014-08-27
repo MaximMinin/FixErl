@@ -4,37 +4,37 @@
 %%% @doc
 %%% Description : @TODO
 %%%
-%%% Created : 28.06.2012
+%%% Created : 27.05.2012
 %%% @end
 %%% -------------------------------------------------------------------
--module(tcp_listener).
+-module(fixerl_tcp_acceptor).
 
 -behaviour(gen_server).
+
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/3]).
+-export([start_link/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {sock}).
+-record(state, {sock, ref, id}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Port, ConcurrentAcceptorCount, AcceptorSup) ->
-    gen_server:start_link(
-      ?MODULE, {Port, ConcurrentAcceptorCount, AcceptorSup}, []).
-
+start_link(Id, LSock) ->
+    gen_server:start_link(?MODULE, {Id, LSock}, []).
 
 %% ====================================================================
 %% Server functions
 %% ====================================================================
+
 %% --------------------------------------------------------------------
 %% Function: init/1
 %% Description: Initiates the server
@@ -43,32 +43,10 @@ start_link(Port, ConcurrentAcceptorCount, AcceptorSup) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init({Port, ConcurrentAcceptorCount, AcceptorSup}) ->
-    process_flag(trap_exit, true),
-    case gen_tcp:listen(Port, 
-                        [
-                         binary,
-                         {packet, raw},
-                         {reuseaddr, true},
-                         {exit_on_close, false},
-                         {active, false}]) of
-        {ok, LSock} ->
-            lists:foreach(fun (_) ->
-                              {ok, _APid} = supervisor:start_child(
-                                                AcceptorSup, [LSock])
-                          end, 
-                lists:duplicate(ConcurrentAcceptorCount, dummy)),
-            {ok, {LIPAddress, LPort}} = inet:sockname(LSock),
-            lager:error("started TCP listener on ~s:~p~n",
-                        [inet_parse:ntoa(LIPAddress), LPort]),
-            {ok, #state{
-                        sock=LSock
-                       }};
-        {error, Reason} ->
-           lager:error(
-              "failed to start TCP listener on: ~p - ~p~n",
-              [Port, Reason]),
-            {stop, {cannot_listen, Port, Reason}}
+init({Id, LSock}) ->
+    case prim_inet:async_accept(LSock, -1) of
+        {ok, Ref} -> {ok, #state{sock=LSock, ref=Ref, id =Id}};
+        Error -> {stop, {cannot_accept, Error}}
     end.
 
 %% --------------------------------------------------------------------
@@ -101,6 +79,25 @@ handle_cast(_Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_info({inet_async, LSock, Ref, {ok, Sock}},
+            State = #state{sock=LSock, ref=Ref, id= Id}) ->
+    {ok, Mod} = inet_db:lookup_socket(LSock),
+    inet_db:register_socket(Sock, Mod),
+    {ok, {Address, Port}} = inet:sockname(LSock),
+    {ok, {PeerAddress, PeerPort}} = inet:peername(Sock),
+    lager:info("accepted TCP connection on ~s:~p from ~s:~p~n",
+                          [inet_parse:ntoa(Address), Port,
+                           inet_parse:ntoa(PeerAddress), PeerPort]),
+    {ok, Child} = fixerl_tcp_client_sup:start_child(Id, []),
+    ok = gen_tcp:controlling_process(Sock, Child),
+    Child ! {go, Sock},
+    case prim_inet:async_accept(LSock, -1) of
+        {ok, NRef} -> {noreply, State#state{ref=NRef}};
+        Error -> {stop, {cannot_accept, Error}, none}
+    end;
+handle_info({inet_async, LSock, Ref, {error, closed}},
+            State=#state{sock=LSock, ref=Ref}) ->
+    {stop, normal, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -109,11 +106,8 @@ handle_info(_Info, State) ->
 %% Description: Shutdown the server
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
-terminate(_Reason, #state{sock=LSock}) ->
-    {ok, {IPAddress, Port}} = inet:sockname(LSock),
-    gen_tcp:close(LSock),
-    lager:error("stopped TCP listener on ~s:~p~n",
-                          [inet_parse:ntoa(IPAddress), Port]).
+terminate(_Reason, _State) ->
+    ok.
 
 %% --------------------------------------------------------------------
 %% Func: code_change/3

@@ -7,7 +7,7 @@
 %%% Created : 28.06.2012
 %%% @end
 %%% -------------------------------------------------------------------
--module(tcp_client_sup).
+-module(fixerl_tcp_client_sup).
 
 -behaviour(supervisor).
 
@@ -54,5 +54,5 @@ start_child(Id, Arg) ->
 %% --------------------------------------------------------------------
 init([Session]) ->
     {ok, {{simple_one_for_one, 10, 10},
-          [{tcp_client, {tcp_reader,start_link,[Session]},
-            permanent, brutal_kill, worker, [tcp_reader]}]}}.
+          [{fixerl_tcp_reader, {fixerl_tcp_reader,start_link,[Session]},
+            permanent, brutal_kill, worker, [fixerl_tcp_reader]}]}}.

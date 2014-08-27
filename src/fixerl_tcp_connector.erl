@@ -7,7 +7,7 @@
 %%% Created: 23.06.2012
 %%% @end
 %%% -------------------------------------------------------------------
--module(tcp_connector).
+-module(fixerl_tcp_connector).
 
 %%
 %% Include files
@@ -36,7 +36,7 @@ init(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout) ->
                                                        ),
     case State of
         {ok, Socket} ->
-            {ok, APid} = tcp_client_sup:start_child(AcceptorSup, Socket),
+            {ok, APid} = fixerl_tcp_client_sup:start_child(AcceptorSup, Socket),
             erlang:monitor(process, APid),
             main_loop(Parent, Host, Port, AcceptorSup, 0, MaxReconnect, ReconnectTimeout);
         Error ->

@@ -7,7 +7,7 @@
 %%% Created : 28.06.2012
 %%% @end
 %%% -------------------------------------------------------------------
--module(tcp_acceptor_sup).
+-module(fixerl_tcp_acceptor_sup).
 
 -behaviour(supervisor).
 
@@ -48,10 +48,10 @@ start_link(Name, Id) ->
 %% --------------------------------------------------------------------
 init([]) ->
     {ok, {{simple_one_for_one, 10, 10},
-          [{tcp_acceptor, {tcp_acceptor, start_link, []},
-            transient, brutal_kill, worker, [tcp_acceptor]}]}};
+          [{fixerl_tcp_acceptor, {fixerl_tcp_acceptor, start_link, []},
+            transient, brutal_kill, worker, [fixerl_tcp_acceptor]}]}};
 init([Id]) ->
     {ok, {{simple_one_for_one, 10, 10},
-          [{tcp_acceptor, {tcp_acceptor, start_link, [Id]},
-            transient, brutal_kill, worker, [tcp_acceptor]}]}}.
+          [{fixerl_tcp_acceptor, {fixerl_tcp_acceptor, start_link, [Id]},
+            transient, brutal_kill, worker, [fixerl_tcp_acceptor]}]}}.
 
