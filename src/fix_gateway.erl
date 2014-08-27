@@ -61,7 +61,11 @@ start_link(Socket, FixVersion,
 init([Socket, FixVersion, 
       SenderCompID, TargetCompID, 
       OutTable, undefined, Id]) ->
-    set_lager_meta_info(Id),
+    lager:md([{session, Id}]),
+    {{Y,M,D},_} = erlang:universaltime(),
+    lager:trace_file(lists:concat(["log/session_", Id,"_",
+                                   Y,M,D,".log"]),
+                                  [{session, Id}], info),
     case mnesia:table_info(OutTable, size) of
         C when erlang:is_integer(C) -> 
             {ok, #state{socket = Socket, count = C, 
@@ -76,7 +80,11 @@ init([Socket, FixVersion,
 init([Socket, FixVersion, 
       SenderCompID, TargetCompID, 
       OutTable, StartSeqNum, Id]) ->
-    set_lager_meta_info(Id),
+    lager:md([{session, Id}]),
+    {{Y,M,D},_} = erlang:universaltime(),
+    lager:trace_file(lists:concat(["log/session_", Id,"_",
+                                   Y,M,D,".log"]),
+                                  [{session, Id}], info),
     {ok, #state{socket = Socket, count = StartSeqNum, 
                 fix_version = FixVersion, 
                 senderCompID = SenderCompID, 
@@ -119,7 +127,7 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
             mnesia:write({T, NewCount , Bin}) end),
         gen_tcp:send(Socket, Bin),
         lager:info([{session, Id}, 
-                    {type, out}], "SEND HEARTBEAT: ~p", 
+                    {type, out}], " -> ~p", 
                     [fix_convertor:format(Record, FixVersion)])
     catch error:Error -> 
             lager:error("~p", [Error])
@@ -147,8 +155,7 @@ handle_cast({send, Record, NotStandardPart},
     mnesia:transaction(fun() -> 
         mnesia:write({T, NewCount , Bin}) end),
     gen_tcp:send(Socket, Bin),
-    lager:info([{session, Id}, 
-                {type, out}], "FIX OUT MESSAGE: ~p", 
+    lager:info([{session, Id}], " -> ~p", 
                [fix_convertor:format(NewRecord, FixVersion)]),
     {noreply, State#state{count = NewCount}};
 handle_cast(_Msg, State) ->
@@ -183,11 +190,4 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
-set_lager_meta_info(Id)->
-    lager:md([{session, Id}]),
-    {{Y,M,D},_} = erlang:universaltime(),
-    lager:trace_file(lists:concat(["log/session_",Id,"_out_",
-                                   Y,M,D,".log"]),
-                                  [{session, Id},
-                                   {type, out}], info).
  

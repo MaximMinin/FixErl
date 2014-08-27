@@ -55,10 +55,9 @@ init([Pid, FixSender, Session]) ->
     Id = Session#session_parameter.id,
     lager:md([{session, Id}]),
     {{Y,M,D},_} = erlang:universaltime(),
-    lager:trace_file(lists:concat(["log/session_", Id,"_in_",
+    lager:trace_file(lists:concat(["log/session_", Id,"_",
                                    Y,M,D,".log"]),
-                                  [{session, Id},
-                                   {type, in}], info),
+                                  [{session, Id}], info),
     State = #state{fix_version = Session#session_parameter.fix_version,
                    pid = Pid, 
                    fixSender = FixSender,
@@ -110,9 +109,8 @@ handle_cast({message, {Msg, NotStandardFields}},
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon -> 
-            log(Id, "LOGON: ~p SenderCompID: ~p TargetCompID: ~p", 
-                      [fix_convertor:format(Msg, FixVersion),
-                       SenderCompID, TargetCompID]),
+            log(Id, " <- ~p", 
+                      [fix_convertor:format(Msg, FixVersion)]),
             case fix_utils:check_logon(FixVersion,
                                        Msg, 
                                        SenderCompID, 
@@ -135,24 +133,24 @@ handle_cast({message, {Msg, NotStandardFields}},
                     erlang:exit(false_logon)
             end;
         testRequest -> 
-            log(Id, "TESTREQUEST: ~p", [fix_convertor:format(Msg, FixVersion)]),
+            log(Id, " <- ~p", [fix_convertor:format(Msg, FixVersion)]),
             fix_gateway:send(FixSender,
                              fix_utils:get_heartbeat(FixVersion,
                                                      Msg));
-        heartbeat -> log(Id, "HEARTBEAT: ~p", [fix_convertor:format(Msg, FixVersion)]);
-        logout -> log(Id, "LOGOUT: ~p", [fix_convertor:format(Msg, FixVersion)]), 
+        heartbeat -> log(Id, " <- ~p", [fix_convertor:format(Msg, FixVersion)]);
+        logout -> log(Id, " <- ~p", [fix_convertor:format(Msg, FixVersion)]), 
                   fix_gateway:send(FixSender,
                       fix_utils:get_logout(FixVersion,
                                            SenderCompID,
                                            TargetCompID)),
                   erlang:exit(fix_session_close);
-        resendRequest -> log(Id, "RESENDREQUEST: ~p", [fix_convertor:format(Msg, FixVersion)]),
+        resendRequest -> log(Id, " <-: ~p", [fix_convertor:format(Msg, FixVersion)]),
             lists:map(fun(Num) -> 
                 [{Tout, Num, ResendMessage}] = 
                  mnesia:dirty_read(({Tout, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(FixVersion, Msg));
-        _Else -> log(Id,  "MESSAGE: ~p",
+        _Else -> log(Id,  " <- ~p",
                      [fix_convertor:format(Msg, FixVersion)]),
                  case Mode of
                      all -> 
@@ -193,5 +191,5 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %% --------------------------------------------------------------------
 log(Id, FormatString, Args) ->
-    lager:info([{session, Id}, {type, in}],
+    lager:info([{session, Id}],
                FormatString, Args).
