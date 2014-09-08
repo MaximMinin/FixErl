@@ -72,8 +72,14 @@ handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid,
             fix_version = FixVersion} = State) ->
     {Broken, Messages} = split(binary:list_to_bin([Last, Data])),
     lists:map(fun(M) ->  
-      try Rec = fix_convertor:fix2record(M, FixVersion),
-          fix_worker:newMessage(ClientPid, Rec)
+      try 
+          case fix_convertor:fix2record(M, FixVersion) of
+              not_valid -> 
+                  lager:error("MESSAGE CAN NOT BE INTERPRETED: ~p~n",
+                        [M]);
+              Rec -> 
+                  fix_worker:newMessage(ClientPid, Rec)
+           end
      catch error:Error -> 
             lager:error("~p - MESSAGE CAN NOT BE INTERPRETED: ~p~n",
                         [M, Error])
@@ -110,34 +116,55 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
-split(Bin) ->
-    [L|Liste] = binary:split(Bin, <<"10=">>, [global]),
-    split(Liste, L, []).
 
-split([E|[]], Last, ToReturn) ->
-    case binary:split(E, <<1>>) of 
-        [<<>>] ->
-            {Last, ToReturn};
-        [Int|Rest] ->
-            {binary:list_to_bin(Rest), 
-            [binary:list_to_bin([Last,<<"10=">>,Int,<<1>>])|ToReturn]}
+split(Bin) -> 
+    [H|T] = binary:split(Bin, <<1,"10=">>, [global]),
+    split(H, T, []).
+
+split(Bin, [], []) ->
+    {Bin, []};
+split(Bin, [<<>>], ToReturn) ->
+    BrokenMsg = binary:list_to_bin([Bin, <<1,"10=">>]),
+    {BrokenMsg, lists:reverse(ToReturn)};
+split(Bin, [Last|[]], ToReturn) ->
+    case get_check_sum(Last) of
+        error ->
+            BrokenMsg = binary:list_to_bin([Bin, <<1,"10=">>, Last]),
+            {BrokenMsg, lists:reverse(ToReturn)};
+        {IsCheckSum, Rest} ->
+            CheckSum = calc_check_sum(Bin),
+            case CheckSum == IsCheckSum of
+                true ->
+                    ValidMsg = binary:list_to_bin([Bin,<<"1,10=">>,IsCheckSum]),
+                     {Rest,lists:reverse([ValidMsg|ToReturn])};
+                false ->
+                    lager:error("CHECKSUM ~p /= ~p - MESSAGE IS NOT VALID: ~p", 
+                                [IsCheckSum, CheckSum, Bin]),
+                    {Rest,lists:reverse([ToReturn])}
+            end
     end;
-split([E|Liste], L, ToReturn) ->
-    Last = case L of
-        L when is_binary(L) -> L;
-        L when is_list(L) -> [L1] = L, L1
-    end,
-    [Int|Rest] =  binary:split(E, <<1>>),
-    CheckSum = lists:sum(erlang:binary_to_list(Last)) rem 256,
-    case CheckSum == list_to_integer(binary_to_list(Int)) of
-        true ->
-            split(Liste, Rest, 
-                [binary:list_to_bin([Last, 
-                                    <<"10=">>, 
-                                    Int, <<1>>])|ToReturn]);
-        false -> 
-            lager:error("MESSAGE IS NOT VALID: ~p", 
-                [binary:list_to_bin([Last, <<"10=">>, Int, <<1>>])]),
-            split(Liste, Rest, ToReturn)
+split(Bin, [H|T], ToReturn) ->
+    case get_check_sum(H) of
+        {IsCheckSum, Rest} ->
+            CheckSum = calc_check_sum(Bin),
+            case CheckSum == IsCheckSum of
+                true ->
+                    ValidMsg = binary:list_to_bin([Bin, <<"1,10=">>, IsCheckSum]),
+                    R = [ValidMsg|ToReturn],
+                    split(Rest, T, R);
+                false ->
+                    lager:error("CHECKSUM ~p /= ~p - MESSAGE IS NOT VALID: ~p", 
+                                [IsCheckSum, CheckSum, Bin]),
+                    split(Rest, T, [ToReturn])
+            end
     end.
 
+get_check_sum(Bin) ->
+    try
+        [Int,Rest] = binary:split(Bin, <<1>>),
+        {list_to_integer(binary_to_list(Int)), Rest}
+    catch _:_ -> error
+    end.
+
+calc_check_sum(Bin) ->
+    (lists:sum(erlang:binary_to_list(Bin))+ 1) rem 256.

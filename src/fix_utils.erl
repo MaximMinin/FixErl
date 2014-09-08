@@ -163,13 +163,17 @@ get_heartbeat(FixVersion, TestRequest)->
 %%
 %% @end
 %% --------------------------------------------------------------------
-get_numbers(FixVersion, ResendRequest)->
+get_numbers(FixVersion, ResendRequest) ->
     Utils = fix_convertor:get_util_module(FixVersion),
     L = Utils:get_record_def(resendRequest),
     P1 = find_first(beginSeqNo, L),
     P2 = find_first(endSeqNo, L),
-    lists:seq(erlang:element(P1, ResendRequest),
-              erlang:element(P2, ResendRequest)).
+    case (P1 > 0) andalso (P2 > 0) andalso (P1 >= P2) of
+        true ->
+            lists:seq(erlang:element(P1, ResendRequest),
+             erlang:element(P2, ResendRequest));
+        false -> []
+    end.
     
 %% --------------------------------------------------------------------
 %% @doc Gets timestamp (now + AddTimeInSec) in fix format 
