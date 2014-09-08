@@ -85,7 +85,7 @@ peername(Sock) ->
         AddressS = inet_parse:ntoa(Address),
         {AddressS, Port}
     catch
-        Ex ->lager:error("error on TCP connection ~p:~p~n",
+        Ex ->lager:info("error on TCP connection ~p:~p~n",
                                [self(), Ex]),
               exit(normal)
     end.
@@ -156,10 +156,13 @@ mainloop(Parent, Deb, State = #state{sock= Sock, recv_ref = Ref}) ->
                    ok;
                true -> ok
             end,
+            lager:info("STOP SESSION: ~p", [Parent]),
             exit(Reason);
-        {'EXIT', _Pid, E = {writer, send_failed, _Error}} ->
+        {'EXIT', _Pid, E = {writer, send_failed, Reason}} ->
+            lager:error("STOP SESSION ~p", [Reason]),
             throw(E);
         {'EXIT', _Pid, Reason} ->
+            lager:error("STOP SESSION ~p", [Reason]),
              throw(Reason);
          terminate_connection ->
             State;

@@ -55,7 +55,7 @@ main_loop(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout) ->
         reconnect ->
             init(Parent, Host, Port, AcceptorSup, C+1, MaxReconnect, ReconnectTimeout);
         {'DOWN', Ref, Type, Object, Info} ->
-            lager:debug("DOWN: ~p ~p ~p ~p~n", [Ref, Type, Object, Info]),
+            lager:info("DOWN: ~p ~p ~p ~p~n", [Ref, Type, Object, Info]),
             exit(normal);
         stop ->
             ok;

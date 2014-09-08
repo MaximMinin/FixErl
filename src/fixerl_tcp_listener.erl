@@ -59,7 +59,7 @@ init({Port, ConcurrentAcceptorCount, AcceptorSup}) ->
                           end, 
                 lists:duplicate(ConcurrentAcceptorCount, dummy)),
             {ok, {LIPAddress, LPort}} = inet:sockname(LSock),
-            lager:error("started TCP listener on ~s:~p~n",
+            lager:info("started TCP listener on ~s:~p~n",
                         [inet_parse:ntoa(LIPAddress), LPort]),
             {ok, #state{
                         sock=LSock
@@ -112,7 +112,7 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{sock=LSock}) ->
     {ok, {IPAddress, Port}} = inet:sockname(LSock),
     gen_tcp:close(LSock),
-    lager:error("stopped TCP listener on ~s:~p~n",
+    lager:info("stopped TCP listener on ~s:~p~n",
                           [inet_parse:ntoa(IPAddress), Port]).
 
 %% --------------------------------------------------------------------

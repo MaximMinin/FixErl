@@ -43,6 +43,7 @@ start_child(Id, Arg) ->
     lager:info("STARTE TCP READER PID: ~p ", [whereis(Id)]),
     lager:info("STARTE TCP READER: ~p ~p", [Id, Arg]),
     supervisor:start_child(Id, [Arg]).
+
 %% ====================================================================
 %% Server functions
 %% ====================================================================
@@ -55,4 +56,4 @@ start_child(Id, Arg) ->
 init([Session]) ->
     {ok, {{simple_one_for_one, 10, 10},
           [{fixerl_tcp_reader, {fixerl_tcp_reader,start_link,[Session]},
-            permanent, brutal_kill, worker, [fixerl_tcp_reader]}]}}.
+            permanent, 10, worker, [fixerl_tcp_reader]}]}}.

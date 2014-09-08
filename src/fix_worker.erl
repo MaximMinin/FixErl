@@ -109,7 +109,7 @@ handle_cast({message, {Msg, NotStandardFields}},
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon -> 
-            log(Id, " <- ~p", 
+            log(Id, " <- ~s", 
                       [fix_convertor:format(Msg, FixVersion)]),
             case fix_utils:check_logon(FixVersion,
                                        Msg, 
@@ -133,24 +133,24 @@ handle_cast({message, {Msg, NotStandardFields}},
                     erlang:exit(false_logon)
             end;
         testRequest -> 
-            log(Id, " <- ~p", [fix_convertor:format(Msg, FixVersion)]),
+            log(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]),
             fix_gateway:send(FixSender,
                              fix_utils:get_heartbeat(FixVersion,
                                                      Msg));
-        heartbeat -> log(Id, " <- ~p", [fix_convertor:format(Msg, FixVersion)]);
-        logout -> log(Id, " <- ~p", [fix_convertor:format(Msg, FixVersion)]), 
+        heartbeat -> log(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]);
+        logout -> log(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]), 
                   fix_gateway:send(FixSender,
                       fix_utils:get_logout(FixVersion,
                                            SenderCompID,
                                            TargetCompID)),
                   erlang:exit(fix_session_close);
-        resendRequest -> log(Id, " <-: ~p", [fix_convertor:format(Msg, FixVersion)]),
+        resendRequest -> log(Id, " <-: ~s", [fix_convertor:format(Msg, FixVersion)]),
             lists:map(fun(Num) -> 
                 [{Tout, Num, ResendMessage}] = 
                  mnesia:dirty_read(({Tout, Num})),
                  fix_gateway:resend(FixSender, ResendMessage) end, 
                  fix_utils:get_numbers(FixVersion, Msg));
-        _Else -> log(Id,  " <- ~p",
+        _Else -> log(Id,  " <- ~s",
                      [fix_convertor:format(Msg, FixVersion)]),
                  case Mode of
                      all -> 
