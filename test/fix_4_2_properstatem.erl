@@ -13,6 +13,8 @@
 -export([initial_state/0, next_state/3,
          precondition/2,postcondition/3,
          command/1]).
+
+-define(FIX_VERSION, 'FIX 4.2').
 -define(MASTER, fixerl).
 -define(DUMMY, dummy).
 
@@ -25,10 +27,11 @@ prop_master() ->
        Cmds, commands(?MODULE),
        ?TRAPEXIT(
       begin
-          start_dummy(),
+          erlang:register(?DUMMY, self()),
           {History, State, Result} = run_commands(?MODULE, Cmds),
-          Messages = stop_dummy(),
-          check_messages(Messages, State#state.messages),
+          Messages = receive_messages(),
+          erlang:unregister(?DUMMY),
+          check_messages(State#state.messages, Messages),
           ?WHENFAIL(
             io:format("History: ~w\n State: ~w\n",
                [History, State]),
@@ -42,15 +45,27 @@ command(#state{}) ->
     {call,?MASTER,send,[test1, fix_4_2_record_generator:test_record()]}.
 
 next_state(S, _V, {call,_,send,[_Name, Record]}) ->
-    S#state{messages = [Record|S#state.messages]}.
+    case erlang:element(1, Record) of
+        resendRequest -> 
+            case fix_utils:get_numbers(?FIX_VERSION, Record) of
+                [] -> S;
+                L ->
+                    [A|_] = L,
+                    E = lists:last(L),
+                    Resended = lists:sublist(S#state.messages, A, E-A),
+                    S#state{messages = lists:append(S#state.messages, Resended)}
+            end;
+        heartbeat ->
+            S;
+        testRequest ->
+            S;
+        _ -> S#state{messages = [Record|S#state.messages]}
+    end.
 
 precondition(_S, {call,_,send,[_Name, Record]}) ->
     case erlang:element(1, Record) of
         logon -> false;
         logout -> false;
-        testRequest -> false;
-        heartbeat -> false;
-        resendRequest -> false;
         _ -> true
     end.
 
@@ -63,11 +78,11 @@ setup() ->
     lager:start(),
     lager:set_loglevel(lager_console_backend, notice),
     fixerl_mnesia_utils:init(),
-    Ret = application:start(fixerl),
+    Ret = fixerl:start(),
     S1 = #session_parameter{
                              id = test1, 
                              port = 12345,  
-                             senderCompId = "TEST1", targetCompId = "TEST", fix_version = 'FIX 4.2',
+                             senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
                              heartbeatInterval = 30, role = acceptor,
                              callback = {?MODULE, callback1}
                            },
@@ -75,7 +90,7 @@ setup() ->
     S = #session_parameter{
                              id = test, 
                              host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
-                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = 'FIX 4.2',
+                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
                              heartbeatInterval = 30, role = initiator,
                              callback = {?MODULE, callback}
                            },
@@ -94,27 +109,15 @@ callback(_Id, M) ->
 callback1(_Id, _M) ->
     ok.
 
-start_dummy() ->
-    Pid = erlang:spawn(?MODULE, receiver_dummy, [[]]),
-    erlang:register(?DUMMY, Pid).
-    
-receiver_dummy(L) ->
-  receive
-     {stop, Pid} -> 
-         erlang:unregister(?DUMMY),
-         Pid ! L; 
-     M ->
-         receiver_dummy([M|L])
-  after 1000 -> ok
-  end.
+receive_messages() ->
+    receive_messages([]).
 
-stop_dummy() ->
-    timer:sleep(100),
-    ?DUMMY ! {stop, self()},
-    receive
-        M -> M
-    after 1000 -> []
-    end.
+receive_messages(L) ->
+  receive
+     M ->
+         receive_messages([M|L])
+  after 300 -> L
+  end.
 
 check_messages([],[]) -> ok;
 check_messages([M|R], [M1|R1]) ->
