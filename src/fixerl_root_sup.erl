@@ -65,8 +65,14 @@ start_session(#session_parameter{id=Id}=S) ->
 %% @end
 %% --------------------------------------------------------------------
 stop_session(SessionId) ->
-    lager:info("Stop child: ~p - ~p",[SessionId, whereis(SessionId)]),
-    supervisor:terminate_child(?MODULE, whereis(SessionId)).
+    lager:info("Stop session: ~p - ~p",[SessionId, whereis(SessionId)]),
+    case whereis(SessionId) of
+        Pid when erlang:is_pid(Pid) ->
+            supervisor:terminate_child(?MODULE, Pid);
+        _Else ->
+            lager:error("Session not found: ~p ",[SessionId]),
+            {error, not_found}
+    end.
 
 %% ====================================================================
 %% Server functions
