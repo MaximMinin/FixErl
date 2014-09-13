@@ -18,7 +18,7 @@
 -define(MASTER, fixerl).
 -define(DUMMY, dummy).
 
--record(state, {messages = []}).
+-record(state, {messages = [],messages1 = []}).
 
 %%% Property
 
@@ -29,9 +29,10 @@ prop_master() ->
       begin
           erlang:register(?DUMMY, self()),
           {History, State, Result} = run_commands(?MODULE, Cmds),
-          Messages = receive_messages(),
+          {Messages, Messages1} = receive_messages(),
           erlang:unregister(?DUMMY),
           check_messages(State#state.messages, Messages),
+          check_messages(State#state.messages1, Messages1),
           ?WHENFAIL(
             io:format("History: ~w\n State: ~w\n",
                [History, State]),
@@ -42,8 +43,29 @@ initial_state() ->
     #state{}.
 
 command(#state{}) ->
-    {call,?MASTER,send,[test1, fix_4_2_record_generator:test_record()]}.
+    oneof([
+           {call,?MASTER,send,[test1, fix_4_2_record_generator:test_record()]},
+           {call,?MASTER,send,[test, fix_4_2_record_generator:test_record(), 
+                              fix_4_2_record_generator:fix_binary()]}
+          ]).
 
+next_state(S, _V, {call,_,send,[test, Record, _Bin]}) ->
+    case erlang:element(1, Record) of
+        resendRequest -> 
+            case fix_utils:get_numbers(?FIX_VERSION, Record) of
+                [] -> S;
+                L ->
+                    [A|_] = L,
+                    E = lists:last(L),
+                    Resended = lists:sublist(S#state.messages1, A, E-A),
+                    S#state{messages1 = lists:append(S#state.messages1, Resended)}
+            end;
+        heartbeat ->
+            S;
+        testRequest ->
+            S;
+        _ -> S#state{messages1 = [Record|S#state.messages1]}
+    end;
 next_state(S, _V, {call,_,send,[_Name, Record]}) ->
     case erlang:element(1, Record) of
         resendRequest -> 
@@ -62,6 +84,14 @@ next_state(S, _V, {call,_,send,[_Name, Record]}) ->
         _ -> S#state{messages = [Record|S#state.messages]}
     end.
 
+precondition(_S, {call,_,send,[test, Record, _Bin]}) ->
+    case erlang:element(1, Record) of
+        logon -> false;
+        logout -> false;
+        resendRequest -> false;
+        _ -> true
+    end;
+
 precondition(_S, {call,_,send,[_Name, Record]}) ->
     case erlang:element(1, Record) of
         logon -> false;
@@ -69,6 +99,8 @@ precondition(_S, {call,_,send,[_Name, Record]}) ->
         _ -> true
     end.
 
+postcondition(_S, {call,_,send,[_Name, _Record, _Bin]}, _Result) ->
+    true;
 postcondition(_S, {call,_,send,[_Name, _Record]}, _Result) ->
     true.
 
@@ -83,7 +115,7 @@ setup() ->
                              id = test1, 
                              port = 12345,  
                              senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 30, role = acceptor,
+                             heartbeatInterval = 5, role = acceptor,
                              callback = {?MODULE, callback1}
                            },
     fixerl:start_session(S1),
@@ -91,7 +123,7 @@ setup() ->
                              id = test, 
                              host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
                              senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 30, role = initiator,
+                             heartbeatInterval = 5, role = initiator,
                              callback = {?MODULE, callback}
                            },
     fixerl:start_session(S),
@@ -104,19 +136,23 @@ clean() ->
     application:stop(lager).
 
 callback(_Id, M) ->
-  ?DUMMY ! M,
-  ok.
-callback1(_Id, _M) ->
+    ?DUMMY ! {test, M},
+    ok.
+
+callback1(_Id, M) ->
+    ?DUMMY ! {test1, M},
     ok.
 
 receive_messages() ->
-    receive_messages([]).
+    receive_messages([], []).
 
-receive_messages(L) ->
+receive_messages(L, L1) ->
   receive
-     M ->
-         receive_messages([M|L])
-  after 300 -> L
+     {test, M}->
+         receive_messages([M|L], L1);
+     {test1, M}->
+         receive_messages(L, [M|L1])
+  after 100 -> {L, L1}
   end.
 
 check_messages([],[]) -> ok;

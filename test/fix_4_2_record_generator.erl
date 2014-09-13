@@ -21,14 +21,16 @@
 test_record() ->
     ?LET(M, msgType(), ?MODULE:M()).
 
-
-
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
 
 fix_string() -> 
     list(choose(36, 126)).
+
+fix_binary() ->
+    ?LET(Bin, binary(),
+    erlang:list_to_binary([<<1>>,Bin,<<1>>])).
 
 fix_float() -> 
     ?LET(F, float(),
