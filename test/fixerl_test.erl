@@ -19,6 +19,9 @@
 fixerl_4_2_proper_test_() ->
     {timeout, 6000, ?_assert(test_4_2_run())}.
 
+fixerl_4_2_resend_proper_test_() ->
+    {timeout, 6000, ?_assert(resend_test_4_2_run())}.
+
 %%
 %% Local Functions
 %%
@@ -28,4 +31,11 @@ test_4_2_run() ->
     %% sleep for heartbeat test ...
     timer:sleep(5*1000*4),
     fix_4_2_properstatem:clean(),
+    R.
+
+resend_test_4_2_run() ->
+    lager:start(),
+    lager:set_loglevel(lager_console_backend, notice),
+    R = proper:quickcheck(proper:numtests(100, fix_4_2_resend_properstatem:prop_master())),
+    application:stop(lager),
     R.

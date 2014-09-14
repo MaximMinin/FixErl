@@ -21,6 +21,19 @@
 test_record() ->
     ?LET(M, msgType(), ?MODULE:M()).
 
+resend_record() ->
+    %%TODO 
+    #resendRequest{standardHeader = #standardHeader{beginString = "FIX.4.2",
+                                                      bodyLength = 97,
+                                                      msgType = resendRequest,
+                                                      senderCompID = "TEST",
+                                                      targetCompID = "TEST1",
+                                                      msgSeqNum = 2,
+                                                      sendingTime = {{2011,8,2},{10,0,0}}},
+                   beginSeqNo = 2, 
+                   endSeqNo = 3,
+                  standardTrailer = #standardTrailer{}}.
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================

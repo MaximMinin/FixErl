@@ -28,6 +28,8 @@ fixerl_4_2_heartbeat_test_() ->
 %%
 test_4_2_run() ->
     setup(),
+    timer:sleep(100),
+    fixerl:reset_session(heartbeat1),
     %% sleep for heartbeat test ...
     timer:sleep(5*1000*4),
     clean(),
@@ -65,7 +67,8 @@ start_sessions() ->
 clean() ->
     stop_sessions(),
     application:stop(fixerl),
-    application:stop(lager).
+    application:stop(lager),
+    application:stop(mnesia).
 
 stop_sessions() -> 
     fixerl:stop_session(test),
