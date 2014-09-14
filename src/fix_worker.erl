@@ -16,7 +16,8 @@
 -include("fixerl.hrl").
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/3, newMessage/2, getMessages/3]).
+-export([start_link/3, newMessage/2, getMessages/3, 
+         get_session_parameter/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, 
@@ -24,13 +25,16 @@
 
 -record(state, {callback, pid, fixSender, count = 0, 
                 senderCompID, targetCompID, role, session_id,
-                mnesia_tables_name, fix_version, mode}).
+                mnesia_tables_name, fix_version, mode,
+                session_params}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
 start_link(Pid, FixSender, Session) ->
-    gen_server:start_link(?MODULE, [Pid, FixSender, 
+    Name = list_to_atom(lists:concat([?MODULE,
+                                      Session#session_parameter.id])),
+    gen_server:start_link({local, Name}, ?MODULE, [Pid, FixSender, 
                                     Session], []).
 
 newMessage(Pid, Message)->
@@ -38,6 +42,11 @@ newMessage(Pid, Message)->
 
 getMessages(Pid, From, To) ->
     gen_server:call(Pid, {getMessages, From, To}).
+
+get_session_parameter(SessionId) ->
+    Name = erlang:list_to_atom(lists:concat([?MODULE,  SessionId])),
+    lager:info("get_session_parameter call ~p:~p", [Name, whereis(Name)]),
+    gen_server:call(Name, get_session_parameter).
 
 %% ====================================================================
 %% Server functions
@@ -58,7 +67,8 @@ init([Pid, FixSender, Session]) ->
     lager:trace_file(lists:concat(["log/session_", Id,"_",
                                    Y,M,D,".log"]),
                                   [{session, Id}], info),
-    State = #state{fix_version = Session#session_parameter.fix_version,
+    State = #state{session_params = Session,
+                   fix_version = Session#session_parameter.fix_version,
                    pid = Pid, 
                    fixSender = FixSender,
                    session_id = Id, 
@@ -81,6 +91,8 @@ init([Pid, FixSender, Session]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call(get_session_parameter, _From, State) ->
+    {reply, State#state.session_params, State};
 handle_call({getMessages, _From, _To}, _From, State) ->
     ToReturn = ok, %%TODO
     {reply, ToReturn, State};
@@ -146,9 +158,11 @@ handle_cast({message, {Msg, NotStandardFields}},
                   erlang:exit(fix_session_close);
         resendRequest -> log(Id, " <-: ~s", [fix_convertor:format(Msg, FixVersion)]),
             lists:map(fun(Num) -> 
-                [{Tout, Num, ResendMessage}] = 
-                 mnesia:dirty_read(({Tout, Num})),
-                 fix_gateway:resend(FixSender, ResendMessage) end, 
+                case  mnesia:dirty_read(({Tout, Num})) of 
+                    [{Tout, Num, ResendMessage}] ->
+                        fix_gateway:resend(FixSender, ResendMessage);
+                    [] -> ok
+                end end, 
                  fix_utils:get_numbers(FixVersion, Msg));
         _Else -> log(Id,  " <- ~s",
                      [fix_convertor:format(Msg, FixVersion)]),

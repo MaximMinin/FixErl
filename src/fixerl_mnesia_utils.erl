@@ -19,11 +19,15 @@
 -export([init/0]).
 
 -export([ensure_mnesia_running/0, 
-         create_table/1,
+         create_table/1, clear_table/1,
          get_tables_name/1]).
 %%
 %% API Functions
 %%
+
+clear_table(SessionId) ->
+    Ts = get_tables_name(SessionId),
+    mnesia:clear_table(Ts).
 
 init() ->
     mnesia:start(),
