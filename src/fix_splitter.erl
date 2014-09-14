@@ -135,7 +135,8 @@ split(Bin, [Last|[]], ToReturn) ->
             CheckSum = calc_check_sum(Bin),
             case CheckSum == IsCheckSum of
                 true ->
-                    ValidMsg = binary:list_to_bin([Bin,<<"1,10=">>,IsCheckSum]),
+                    SasB = list_to_binary(integer_to_list(IsCheckSum)),
+                    ValidMsg = binary:list_to_bin([Bin,<<1,"10=">>,SasB]),
                      {Rest,lists:reverse([ValidMsg|ToReturn])};
                 false ->
                     lager:error("CHECKSUM ~p /= ~p - MESSAGE IS NOT VALID: ~p", 
@@ -149,7 +150,8 @@ split(Bin, [H|T], ToReturn) ->
             CheckSum = calc_check_sum(Bin),
             case CheckSum == IsCheckSum of
                 true ->
-                    ValidMsg = binary:list_to_bin([Bin, <<"1,10=">>, IsCheckSum]),
+                    SasB = list_to_binary(integer_to_list(IsCheckSum)),
+                    ValidMsg = binary:list_to_bin([Bin, <<1,"10=">>, SasB]),
                     R = [ValidMsg|ToReturn],
                     split(Rest, T, R);
                 false ->

@@ -168,7 +168,7 @@ get_numbers(FixVersion, ResendRequest) ->
     L = Utils:get_record_def(resendRequest),
     P1 = find_first(beginSeqNo, L),
     P2 = find_first(endSeqNo, L),
-    case (P1 > 0) andalso (P2 > 0) andalso (P1 >= P2) of
+    case (P1 > 0) andalso (P2 > 0) andalso (P1 =< P2) of
         true ->
             lists:seq(erlang:element(P1, ResendRequest),
              erlang:element(P2, ResendRequest));
