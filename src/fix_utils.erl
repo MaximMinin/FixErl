@@ -80,8 +80,26 @@ get_logout(FixVersion, SenderCompID, TargetCompID) ->
 %%                 TargetCompID::binary()) -> #logon{}
 %% @end
 %% --------------------------------------------------------------------
+get_logon('FIX 5.0', SenderCompID, TargetCompID) ->
+    Utils = fix_convertor:get_util_module('FIX 5.0'),
+    Utils:setFieldInRecord(logon, defaultApplVerID,
+                            get_logon2(Utils, SenderCompID, 
+                                       TargetCompID), "7");
+get_logon('FIX 5.0 SP 1', SenderCompID, TargetCompID) ->
+    Utils = fix_convertor:get_util_module('FIX 5.0 SP 1'),
+    Utils:setFieldInRecord(logon, defaultApplVerID,
+                            get_logon2(Utils, SenderCompID, 
+                                       TargetCompID), "8");
+get_logon('FIX 5.0 SP 2', SenderCompID, TargetCompID) ->
+    Utils = fix_convertor:get_util_module('FIX 5.0 SP 2'),
+    Utils:setFieldInRecord(logon, defaultApplVerID,
+                            get_logon2(Utils, SenderCompID, 
+                                       TargetCompID), "9");
 get_logon(FixVersion, SenderCompID, TargetCompID) ->
     Utils = fix_convertor:get_util_module(FixVersion),
+    get_logon2(Utils, SenderCompID, TargetCompID).
+
+get_logon2(Utils, SenderCompID, TargetCompID) ->
     L = Utils:getRecord(logon),
     H = Utils:getRecord(standardHeader),
     T = Utils:getRecord(standardTrailer),
