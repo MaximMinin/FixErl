@@ -35,8 +35,9 @@ prop_master() ->
           Messages  = receive_messages(),
           erlang:unregister(?DUMMY),
           fix_4_2_resend_properstatem:clean(),
-%%           io:format("State:~p~n" ,[State#state.messages]),
-%%           io:format("Receive:~p~n",[Messages]),
+%%          io:format("State:~p~n" ,[State#state.messages]),
+%%          io:format("Receive:~p~n",[Messages]),
+          io:format("Result:~p~n",[Result]),
           true = check_messages(State#state.messages, Messages),
           ?WHENFAIL(
             io:format("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
@@ -143,11 +144,11 @@ receive_messages(L) ->
   receive
      M->
          receive_messages([M|L])
-  after 300 -> L
+  after 500 -> L
   end.
 
 check_messages(L, L1) ->
-%%     io:format("L ~p L1 ~p~n", [length(L),length(L1)]),
+%%  io:format("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
     erlang:length(L) == erlang:length(L1).
 %% check_messages([],[]) -> ok;
 %% check_messages([M|R], [M1|R1]) ->
