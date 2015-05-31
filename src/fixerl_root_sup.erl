@@ -87,7 +87,7 @@ stop_session(SessionId) ->
 init([]) ->
     AChild = {fix_session_sup, {fix_session_sup, start_link,[]},
 	      permanent,2000,supervisor,[fix_session_sup]},
-    {ok,{{simple_one_for_one,0,1}, [AChild]}}.
+    {ok,{{simple_one_for_one,10,10}, [AChild]}}.
 
 %% ====================================================================
 %% Internal functions

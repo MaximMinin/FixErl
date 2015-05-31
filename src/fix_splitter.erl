@@ -16,19 +16,19 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/2, newRowData/2]).
+-export([start_link/3, newRowData/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, 
          handle_info/2, terminate/2, code_change/3]).
 
--record(state, {last = <<>>, clientPid, fix_version}).
+-record(state, {last = <<>>, clientPid, fix_version, check}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
-start_link(Pid, FixVersion)->
-    gen_server:start_link(?MODULE, [Pid, FixVersion], []).
+start_link(Pid, FixVersion, Check)->
+    gen_server:start_link(?MODULE, [Pid, FixVersion, Check], []).
 
 %% ====================================================================
 %% Server functions
@@ -42,8 +42,10 @@ start_link(Pid, FixVersion)->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Client, FixVersion]) ->
-    {ok, #state{clientPid = Client, fix_version = FixVersion}}.
+init([Client, FixVersion, Check]) ->
+    {ok, #state{clientPid = Client,
+                fix_version = FixVersion,
+                check = Check}}.
 
 newRowData(Pid, Data) ->
     gen_server:cast(Pid, {new, Data}).
@@ -69,8 +71,8 @@ handle_call(_Request, _From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_cast({new, Data}, #state{last = Last, clientPid = ClientPid, 
-            fix_version = FixVersion} = State) ->
-    {Broken, Messages} = split(binary:list_to_bin([Last, Data])),
+            fix_version = FixVersion, check = Check} = State) ->
+    {Broken, Messages} = split(binary:list_to_bin([Last, Data]), Check),
     lists:map(fun(M) ->  
       try 
           case fix_convertor:fix2record(M, FixVersion) of
@@ -117,23 +119,23 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %% --------------------------------------------------------------------
 
-split(Bin) -> 
+split(Bin, Check) -> 
     [H|T] = binary:split(Bin, <<1,"10=">>, [global]),
-    split(H, T, []).
+    split(H, T, [], Check).
 
-split(Bin, [], []) ->
+split(Bin, [], [], _Check) ->
     {Bin, []};
-split(Bin, [<<>>], ToReturn) ->
+split(Bin, [<<>>], ToReturn, Check) ->
     BrokenMsg = binary:list_to_bin([Bin, <<1,"10=">>]),
     {BrokenMsg, lists:reverse(ToReturn)};
-split(Bin, [Last|[]], ToReturn) ->
+split(Bin, [Last|[]], ToReturn, Check) ->
     case get_check_sum(Last) of
         error ->
             BrokenMsg = binary:list_to_bin([Bin, <<1,"10=">>, Last]),
             {BrokenMsg, lists:reverse(ToReturn)};
         {IsCheckSum, Rest} ->
             CheckSum = calc_check_sum(Bin),
-            case CheckSum == IsCheckSum of
+            case CheckSum == IsCheckSum orelse not Check of
                 true ->
                     SasB = list_to_binary(integer_to_list(IsCheckSum)),
                     ValidMsg = binary:list_to_bin([Bin,<<1,"10=">>,SasB]),
@@ -144,20 +146,20 @@ split(Bin, [Last|[]], ToReturn) ->
                     {Rest,lists:reverse([ToReturn])}
             end
     end;
-split(Bin, [H|T], ToReturn) ->
+split(Bin, [H|T], ToReturn, Check) ->
     case get_check_sum(H) of
         {IsCheckSum, Rest} ->
             CheckSum = calc_check_sum(Bin),
-            case CheckSum == IsCheckSum of
+            case CheckSum == IsCheckSum  orelse not Check of
                 true ->
                     SasB = list_to_binary(integer_to_list(IsCheckSum)),
                     ValidMsg = binary:list_to_bin([Bin, <<1,"10=">>, SasB]),
                     R = [ValidMsg|ToReturn],
-                    split(Rest, T, R);
+                    split(Rest, T, R, Check);
                 false ->
                     lager:error("CHECKSUM ~p /= ~p - MESSAGE IS NOT VALID: ~p", 
                                 [IsCheckSum, CheckSum, Bin]),
-                    split(Rest, T, [ToReturn])
+                    split(Rest, T, [ToReturn], Check)
             end
     end.
 

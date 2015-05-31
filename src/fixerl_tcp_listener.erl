@@ -50,7 +50,7 @@ init({Port, ConcurrentAcceptorCount, AcceptorSup}) ->
                          binary,
                          {packet, raw},
                          {reuseaddr, true},
-                         {exit_on_close, false},
+                         {exit_on_close, true},
                          {active, false}]) of
         {ok, LSock} ->
             lists:foreach(fun (_) ->

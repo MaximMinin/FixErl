@@ -31,13 +31,14 @@ init(Parent, Host, Port, AcceptorSup, C, MaxReconnect, ReconnectTimeout) ->
                          binary,
                          {packet, raw}, % no packaging
                          {reuseaddr, true}, % allow rebind without waiting
-                         {exit_on_close, false},
+                         {exit_on_close, true},
                          {active, false}]
                                                        ),
     case State of
         {ok, Socket} ->
             {ok, APid} = fixerl_tcp_client_sup:start_child(AcceptorSup, Socket),
             erlang:monitor(process, APid),
+            lager:info("Socket: ~p Pid: ~p", [Socket, APid]),
             main_loop(Parent, Host, Port, AcceptorSup, 0, MaxReconnect, ReconnectTimeout);
         Error ->
             lager:error("~p - ERROR: ~p~n", [?MODULE, Error]),

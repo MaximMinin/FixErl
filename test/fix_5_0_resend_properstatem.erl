@@ -1,13 +1,13 @@
 %% Author: Maxim Minin
 %% Created: 01.09.2014
-%% Description: TODO: Add description to fix_4_2_resend_properstatem
--module(fix_4_2_resend_properstatem).
+%% Description: TODO: Add description to fix_5_0_resend_properstatem
+-module(fix_5_0_resend_properstatem).
 
 -behaviour(proper_statem).
 
 -include_lib("proper/include/proper.hrl").
 -include("fixerl.hrl").
--include_lib("fix_convertor/include/FIX_4_2.hrl").
+-include_lib("fix_convertor/include/FIX_5_0.hrl").
 
 -compile([{no_auto_import, [date/0, time/0]}, 
           export_all, debug_info]).
@@ -15,10 +15,10 @@
          precondition/2,postcondition/3,
          command/1]).
 
--define(FIX_VERSION, 'FIX 4.2').
+-define(FIX_VERSION, 'FIX 5.0').
 -define(MASTER, fixerl).
 -define(DUMMY, dummy).
--define(ID_, fix_4_2_resend_properstatem_reply).
+-define(ID_, fix_5_0_resend_properstatem_send).
 -record(state, {messages = []}).
 
 %%% Property
@@ -28,17 +28,19 @@ prop_master() ->
        Cmds, commands(?MODULE),
        ?TRAPEXIT(
       begin
-          fix_4_2_resend_properstatem:setup(),
+          fix_5_0_resend_properstatem:setup(),
           erlang:register(?DUMMY, self()),
           timer:sleep(200),
           {History, State, Result} = run_commands(?MODULE, Cmds),
           Messages  = receive_messages(),
           erlang:unregister(?DUMMY),
-          fix_4_2_resend_properstatem:clean(),
-%%          io:format("State:~p~n" ,[State#state.messages]),
-%%          io:format("Receive:~p~n",[Messages]),
+          fix_5_0_resend_properstatem:clean(),
+          io:format("State:~p~n" ,[State#state.messages]),
+          io:format("Receive:~p~n",[Messages]),
           io:format("Result:~p~n",[Result]),
-          true = check_messages(State#state.messages, Messages),
+          C = check_messages(State#state.messages, Messages),
+          io:format("check_messages:~p~n",[C]),
+          true = C,
           ?WHENFAIL(
             io:format("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
                [lists:sort(State#state.messages),lists:sort(Messages), History, State]),
@@ -49,11 +51,11 @@ initial_state() ->
     #state{}.
 
 command(#state{messages = []}) ->
-    {call,?MASTER,send,[?ID_, fix_4_2_record_generator:test_record()]};
+    {call,?MASTER,send,[?ID_, fix_5_0_record_generator:test_record()]};
 command(#state{}) ->
     oneof([
-           {call,?MASTER,send,[?ID_, fix_4_2_record_generator:test_record()]},
-           {call,?MASTER,send,[?MODULE, fix_4_2_record_generator:resend_record()]}
+           {call,?MASTER,send,[?ID_, fix_5_0_record_generator:test_record()]},
+           {call,?MASTER,send,[?MODULE, fix_5_0_record_generator:resend_record()]}
           ]).
 
 next_state(S, _V, {call,_,send,[?MODULE, Record]}) ->
@@ -100,7 +102,7 @@ setup() ->
     Ret = fixerl:start(),
     S1 = #session_parameter{
                              id = ?ID_, 
-                             port = 23451,  
+                             port = 12345,  
                              senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = acceptor, 
                              message_checks = #message_checks{check_msgSeqNum = false},
@@ -109,7 +111,7 @@ setup() ->
     fixerl:start_session(S1),
     S = #session_parameter{
                              id = ?MODULE, 
-                             host = localhost, port = 23451, max_reconnect = 10, reconnect_interval = 20, 
+                             host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
                              senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = initiator, 
                              message_checks = #message_checks{check_msgSeqNum = false},
@@ -150,10 +152,5 @@ receive_messages(L) ->
   end.
 
 check_messages(L, L1) ->
-%%  io:format("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
+   io:format("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
     erlang:length(L) == erlang:length(L1).
-%% check_messages([],[]) -> ok;
-%% check_messages([M|R], [M1|R1]) ->
-%%     true = fix_4_2_record_generator:is_eq(M, M1),
-%%     check_messages(R, R1).
-

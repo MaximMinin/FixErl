@@ -160,10 +160,10 @@ mainloop(Parent, Deb, State = #state{sock= Sock, recv_ref = Ref}) ->
             exit(Reason);
         {'EXIT', _Pid, E = {writer, send_failed, Reason}} ->
             lager:error("STOP SESSION ~p", [Reason]),
-            throw(E);
+            exit(E);
         {'EXIT', _Pid, Reason} ->
             lager:error("STOP SESSION ~p", [Reason]),
-             throw(Reason);
+             exit(Reason);
          terminate_connection ->
             State;
         handshake_timeout ->
@@ -186,7 +186,7 @@ mainloop(Parent, Deb, State = #state{sock= Sock, recv_ref = Ref}) ->
              mainloop(Parent, Deb,
              State#state{callback =  C});
         timeout ->
-            throw({timeout, State#state.connection_state});
+            exit({timeout, State#state.connection_state});
         {'$gen_call', _From, info} ->
             %%TODO gen_server:reply(From, infos(?INFO_KEYS, State)),
             mainloop(Parent, Deb, State);
@@ -212,7 +212,9 @@ switch_callback(OldState, NewCallback, Length) ->
 handle_input_fix(handshake, Data,
              State = #state{session_par = Session, sock = Sock, connection = Connection, writer = WriterPid}) ->
     {ok, FixPid} = fix_worker:start_link(self(), WriterPid, Session),
-    {ok, Splitter} = fix_splitter:start_link(FixPid, Session#session_parameter.fix_version), 
+    {ok, Splitter} = fix_splitter:start_link(FixPid, 
+                                             Session#session_parameter.fix_version,
+                                             Session#session_parameter.message_checks#message_checks.check_CheckSum), 
     fix_splitter:newRowData(Splitter, Data),
     fix_heartbeat:start_heartbeat(Sock, WriterPid, Session#session_parameter.heartbeatInterval),
     {State#state{worker = Splitter,

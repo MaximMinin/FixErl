@@ -16,7 +16,7 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/6, send/2, send/3, 
+-export([start_link/6, send/2, send/3, save/2,
          resend/2, send_heartbeat/1]).
 
 %% gen_server callbacks
@@ -30,14 +30,16 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
+save(Pid, Message) ->
+    gen_server:call(Pid, {save, Message}).
 send(Pid, Message)->
-    gen_server:cast(Pid, {send, Message, <<>>}).
+    gen_server:call(Pid, {send, Message, <<>>}).
 send(Pid, Message, NotStandardPart)->
-    gen_server:cast(Pid, {send, Message, NotStandardPart}).
+    gen_server:call(Pid, {send, Message, NotStandardPart}).
 send_heartbeat(Pid)->
-    gen_server:cast(Pid, send_heartbeat).
+    gen_server:call(Pid, send_heartbeat).
 resend(Pid, Message)->
-    gen_server:cast(Pid, {resend, Message}).
+    gen_server:call(Pid, {resend, Message}).
 
 %% ====================================================================
 %% Server functions
@@ -102,18 +104,8 @@ init([Socket, FixVersion,
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
-
-%% --------------------------------------------------------------------
-%% Function: handle_cast/2
-%% Description: Handling cast messages
-%% Returns: {noreply, State}          |
-%%          {noreply, State, Timeout} |
-%%          {stop, Reason, State}            (terminate/2 is called)
-%% --------------------------------------------------------------------
-handle_cast(send_heartbeat, #state{socket = Socket, count = Count, 
+handle_call(send_heartbeat, _From,
+            #state{socket = Socket, count = Count, 
             senderCompID = SenderCompID, targetCompID = TargetCompID,
             fix_version = FixVersion, table_out_name = T, id = Id} 
            = State) ->
@@ -132,15 +124,18 @@ handle_cast(send_heartbeat, #state{socket = Socket, count = Count,
     catch error:Error -> 
             lager:error("~p", [Error])
     end,
-    {noreply, State#state{count = NewCount}};
-handle_cast({resend, Bin}, #state{socket = Socket} = State) ->
+    {reply, ok, State#state{count = NewCount}};
+handle_call({resend, Bin}, _From, #state{socket = Socket,
+                                         id = Id} = State) ->
     try 
-        gen_tcp:send(Socket, Bin)
+        gen_tcp:send(Socket, Bin),
+        lager:info([{session, Id}], " resend -> ~p", 
+                   [Bin])
     catch error:Error -> 
             lager:error("~p", [Error])
     end,
-    {noreply, State};
-handle_cast({send, Record, NotStandardPart}, 
+    {reply, ok, State};
+handle_call({send, Record, NotStandardPart}, _From,
             #state{socket = Socket, count = Count, 
                    fix_version = FixVersion,
                    table_out_name = T,
@@ -157,7 +152,29 @@ handle_cast({send, Record, NotStandardPart},
     gen_tcp:send(Socket, Bin),
     lager:info([{session, Id}], " -> ~p", 
                [fix_convertor:format(NewRecord, FixVersion)]),
-    {noreply, State#state{count = NewCount}};
+    {reply, ok, State#state{count = NewCount}};
+handle_call({save, Record}, _From,
+            #state{socket = Socket, count = Count, 
+                   fix_version = FixVersion,
+                   table_out_name = T,
+                   id = Id} = State)
+            when erlang:is_tuple(Record) ->
+    NewCount = Count+1,
+    NewRecord = fix_convertor:set_msg_seqnum(Record, 
+                                       NewCount, FixVersion), 
+    Bin = fix_convertor:record2fix(NewRecord, FixVersion), 
+    mnesia:transaction(fun() -> 
+        mnesia:write({T, NewCount , Bin}) end),
+    lager:info([{session, Id}], " save -> ~p", 
+               [fix_convertor:format(NewRecord, FixVersion)]),
+    {reply, ok, State#state{count = NewCount}}.
+%% --------------------------------------------------------------------
+%% Function: handle_cast/2
+%% Description: Handling cast messages
+%% Returns: {noreply, State}          |
+%%          {noreply, State, Timeout} |
+%%          {stop, Reason, State}            (terminate/2 is called)
+%% --------------------------------------------------------------------
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

@@ -1,7 +1,7 @@
 %% Author: Maxim Minin
 %% Created: 24.06.2012
-%% Description: TODO: Add description to fixerl_heartbeat_test
--module(fixerl_heartbeat_test).
+%% Description: TODO: Add description to fixerl_restart_test
+-module(fixerl_restart_test).
 
 %%
 %% Include files
@@ -14,24 +14,26 @@
 %%
 -compile([export_all]).
 
--define(FIX_VERSION, 'FIX 4.2').
+-define(FIX_VERSION, 'FIX 5.0').
 
 %%
 %% API Functions
 %%
 
-fixerl_4_2_heartbeat_test_() ->
-    {timeout, 6000, ?_assert(test_4_2_run())}.
+fixerl_restart_test_() ->
+    {timeout, 60000, ?_assert(test_run())}.
 
 %%
 %% Local Functions
 %%
-test_4_2_run() ->
+test_run() ->
     setup(),
-    timer:sleep(100),
-    fixerl:reset_session(heartbeat1),
-    %% sleep for heartbeat test ...
-    timer:sleep(5*1000*4),
+    timer:sleep(5000),
+    try
+    fixerl:send(heartbeat1, bla)
+    catch Err:F  -> lager:info("ENDE ~p  ~p", [Err, F])
+    end,
+    timer:sleep(3500),
     clean(),
     true.
 
@@ -42,24 +44,35 @@ setup() ->
     lager:start(),
     lager:set_loglevel(lager_console_backend, notice),
     fixerl_mnesia_utils:init(),
-    ok = fixerl:start(),
+    ok = application:start(fixerl),
     start_sessions().
 
 start_sessions() ->
+    start_sessions_2(),
+%%     timer:sleep(200),
+    start_sessions_1().
+
+start_sessions_1() ->
+    
     S1 = #session_parameter{
                              id = heartbeat, 
-                             port = 54322,  
+                             port = 54321,  
                              senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 30, role = acceptor,
+                             heartbeatInterval = 30, role = acceptor,max_reconnect = 10, reconnect_interval = 2, 
+                             message_checks = #message_checks{check_msgSeqNum = true},
                              callback = {?MODULE, callback1}
                            },
     fixerl:start_session(S1),
+    ok.
+
+start_sessions_2() ->
     S = #session_parameter{
                              id = heartbeat1, 
-                             host = localhost, port = 54322, max_reconnect = 10, reconnect_interval = 20, 
+                             host = localhost, port = 54321, max_reconnect = 10, reconnect_interval = 4, 
                              senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 5, role = initiator,
-                             callback = {?MODULE, callback}, start_seqnum = 10
+                             heartbeatInterval = 30, role = initiator,
+                             message_checks = #message_checks{check_msgSeqNum = true},
+                             callback = {?MODULE, callback}
                            },
     fixerl:start_session(S),
     ok.
@@ -71,8 +84,8 @@ clean() ->
     application:stop(mnesia).
 
 stop_sessions() -> 
-    fixerl:stop_session(heartbeat),
-    fixerl:stop_session(heartbeat1).
+    fixerl:stop_session(heartbeat1),
+    fixerl:stop_session(heartbeat).
 
 callback(_Id, _M) ->
     ok.

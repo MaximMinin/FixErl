@@ -26,7 +26,11 @@
 -record(state, {callback, pid, fixSender, count = 0, 
                 senderCompID, targetCompID, role, session_id,
                 mnesia_tables_name, fix_version, mode,
-                session_params}).
+                session_params, sync_flag = false, diff, diff_count}).
+
+-define(LOG(Id, FormatString, Args),
+    lager:info([{session, Id}],
+               FormatString, Args)).
 
 %% ====================================================================
 %% External functions
@@ -67,19 +71,26 @@ init([Pid, FixSender, Session]) ->
     lager:trace_file(lists:concat(["log/session_", Id,"_",
                                    Y,M,D,".log"]),
                                   [{session, Id}], info),
-    State = #state{session_params = Session,
-                   fix_version = Session#session_parameter.fix_version,
-                   pid = Pid, 
-                   fixSender = FixSender,
-                   session_id = Id, 
-                   senderCompID = Session#session_parameter.senderCompId,
-                   targetCompID = Session#session_parameter.targetCompId, 
-                   callback = Session#session_parameter.callback,
-                   role = Session#session_parameter.role,
-                   mode = Session#session_parameter.callback_mode,
-                   mnesia_tables_name = 
-                       fixerl_mnesia_utils:get_tables_name(Id)},
-    {ok, State}.
+    TableNames = fixerl_mnesia_utils:get_tables_name(Id),
+    [In|_] = TableNames,
+    case mnesia:table_info(In, size) of
+        C when erlang:is_integer(C) -> 
+            State = #state{session_params = Session,
+                           fix_version = Session#session_parameter.fix_version,
+                           pid = Pid, 
+                           fixSender = FixSender,
+                           session_id = Id, 
+                           senderCompID = Session#session_parameter.senderCompId,
+                           targetCompID = Session#session_parameter.targetCompId, 
+                           callback = Session#session_parameter.callback,
+                           role = Session#session_parameter.role,
+                           mode = Session#session_parameter.callback_mode,
+                           mnesia_tables_name = TableNames,
+                          count = C},
+            {ok, State};
+        {aborted, Reason} ->
+            {stop, Reason}
+    end.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -111,23 +122,91 @@ handle_cast({message, {Msg, NotStandardFields}},
                                    fix_version = FixVersion,
                                    senderCompID = SenderCompID, 
                                    targetCompID = TargetCompID,
-                                   count = C, callback = {M,F}, 
+                                   callback = {M,F}, 
                                    role = Role, 
                                    session_id = Id,
                                    mode = Mode,
                                    mnesia_tables_name = [Tin,Tout]} = State) ->
-    mnesia:transaction(fun() -> 
-        mnesia:write({Tin, C+1 , Msg}) end),
+    ?LOG(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]),
+    CheckMsgSeqNum = ((State#state.session_params)#session_parameter.message_checks)#message_checks.check_msgSeqNum,
+    CheckCompIds = ((State#state.session_params)#session_parameter.message_checks)#message_checks.check_CompIds,
+    SyncFlagOld = State#state.sync_flag,
+    InC = fix_utils:get_seq_number(FixVersion, Msg),
+    C = State#state.count + 1,
+    {SyncFlag, NewC, Diff, DiffCount} = 
+    case {SyncFlagOld, InC == C, InC < C, CheckMsgSeqNum} of
+        {false, true, false, _} -> 
+                process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
+                            SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
+                            CheckCompIds, State#state.count + 1),
+                ?LOG(Id, "session is ok", []),
+                {false, State#state.count + 1, undefined, undefined};
+        {true, true, false, true} -> 
+                process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
+                            SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
+                            CheckCompIds, State#state.count + 1),
+                case State#state.diff > State#state.diff_count of
+                    false ->
+                        ?LOG(Id, "session is sync again", []),
+                        {false, State#state.count + 1, 
+                         undefined, undefined};
+                    true ->
+                        ?LOG(Id, "session sync run: ~p ~p", [State#state.diff , State#state.diff_count]),
+                        {true, State#state.count + 1, 
+                         State#state.diff , State#state.diff_count +1}
+                end;
+        {false, false, true, true} ->
+                ?LOG(Id, "msgSeqNum too low - accepted: ~p received: ~p ",
+                    [C, InC]),
+                fix_gateway:send(FixSender,
+                    fix_utils:get_logout(FixVersion,
+                                        SenderCompID,
+                                        TargetCompID)),
+                erlang:exit(msg_seq_num_too_low);
+        {true, false, true, true} ->
+                    process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
+                                SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
+                                CheckCompIds, State#state.count + 1),
+                    {true, State#state.count + 1, State#state.diff , State#state.diff_count +1};
+        {false, false, false, true} ->
+            ?LOG(Id, " accepted msgSeqNum: ~p received: ~p send resend request",
+                [C, InC]),
+            fix_gateway:send(FixSender,
+                        fix_utils:get_resend_request(FixVersion,
+                                            SenderCompID,
+                                            TargetCompID, InC, C)),
+            {true, State#state.count, InC - C, 0};
+        {true, false, false, true} ->
+            ?LOG(Id, " accepted msgSeqNum: ~p received: ~p sync in doing - ignore msg",
+                [C, InC]),
+            {true, State#state.count, State#state.diff , State#state.diff_count};
+        {_, _, _, false} ->
+            process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
+                        SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
+                        CheckCompIds, State#state.count + 1),
+            ?LOG(Id, " accepted msgSeqNum: ~p received: ~p",
+                [C, InC]),
+            {false, State#state.count, undefined, undefined};
+        Else ->
+            ?LOG(Id, " Something is wrong: ~p ", [Else]),
+            erlang:exit(todo)
+    end,
+    {noreply, State#state{count = NewC, 
+                          sync_flag = SyncFlag, diff = Diff, diff_count = DiffCount}}.
+
+process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
+            SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
+            CheckCompIds, C) ->
+    mnesia:transaction(fun() ->
+        mnesia:write({Tin, C , Msg}) end),
     case erlang:element(1, Msg) of
         %%TODO sessionhandling
         logon -> 
-            log(Id, " <- ~s", 
-                      [fix_convertor:format(Msg, FixVersion)]),
-            case fix_utils:check_logon(FixVersion,
+            case not CheckCompIds orelse ok == fix_utils:check_logon(FixVersion,
                                        Msg, 
                                        SenderCompID, 
                                        TargetCompID) of
-                ok -> 
+                true -> 
                     case Role of
                         acceptor ->
                             fix_gateway:send(FixSender,
@@ -137,7 +216,7 @@ handle_cast({message, {Msg, NotStandardFields}},
                         initiator -> ok
                     end,
                     Pid ! fix_starting;
-                nok -> 
+                false -> 
                     fix_gateway:send(FixSender,
                         fix_utils:get_logout(FixVersion,
                                             SenderCompID,
@@ -145,35 +224,32 @@ handle_cast({message, {Msg, NotStandardFields}},
                     erlang:exit(false_logon)
             end;
         testRequest -> 
-            log(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]),
             fix_gateway:send(FixSender,
                              fix_utils:get_heartbeat(FixVersion,
                                                      Msg));
-        heartbeat -> log(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]);
-        logout -> log(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]), 
-                  fix_gateway:send(FixSender,
-                      fix_utils:get_logout(FixVersion,
-                                           SenderCompID,
-                                           TargetCompID)),
-                  erlang:exit(fix_session_close);
-        resendRequest -> log(Id, " <-: ~s", [fix_convertor:format(Msg, FixVersion)]),
+        heartbeat -> ok;
+        logout ->
+            fix_gateway:send(FixSender,
+                fix_utils:get_logout(FixVersion,
+                                     SenderCompID,
+                                     TargetCompID)),
+            erlang:exit(fix_session_close);
+        resendRequest ->
             lists:map(fun(Num) -> 
-                case  mnesia:dirty_read(({Tout, Num})) of 
+                case  mnesia:dirty_read({Tout, Num}) of
                     [{Tout, Num, ResendMessage}] ->
                         fix_gateway:resend(FixSender, ResendMessage);
                     [] -> ok
                 end end, 
                  fix_utils:get_numbers(FixVersion, Msg));
-        _Else -> log(Id,  " <- ~s",
-                     [fix_convertor:format(Msg, FixVersion)]),
-                 case Mode of
-                     all -> 
-                         M:F(Id, Msg, NotStandardFields);
-                     _Standard ->
-                         M:F(Id, Msg)
-                 end
-    end,
-    {noreply, State#state{count = C+1}}.
+        _Else ->
+            case Mode of
+                all -> 
+                    M:F(Id, Msg, NotStandardFields);
+                _Standard ->
+                    M:F(Id, Msg)
+            end
+    end.
 
 %% --------------------------------------------------------------------
 %% Function: handle_info/2
@@ -204,6 +280,4 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
-log(Id, FormatString, Args) ->
-    lager:info([{session, Id}],
-               FormatString, Args).
+

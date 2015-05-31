@@ -19,8 +19,9 @@
 -export([get_logon/3, get_logout/3,
          check_logon/4, 
          get_heartbeat/3, get_heartbeat/2,
-         get_numbers/2, 
-         getNow/0, getNow/1, getUniq/0]).
+         get_numbers/2, get_seq_number/2,
+         getNow/0, getNow/1, getUniq/0,
+         get_resend_request/5]).
 
 %% ====================================================================
 %% API Functions
@@ -138,6 +139,46 @@ get_heartbeat(FixVersion, SenderCompID, TargetCompID)->
                            heartbeat), ?MODULE:getNow()),
                            TargetCompID)),
                            ?MODULE:getUniq()).
+
+%% --------------------------------------------------------------------
+%% @doc Gets the resendRequest message
+%%
+%% @spec get_resendRequest(SenderCompID::binary(), 
+%%                     TargetCompID::binary()) -> #hearbeat{}
+%% @end
+%% --------------------------------------------------------------------
+get_resend_request(FixVersion, SenderCompID, TargetCompID, BeginSeqNo, EndSeqNo)->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:getRecord(resendRequest),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(resendRequest,beginSeqNo,
+    Utils:setFieldInRecord(resendRequest,endSeqNo,
+    Utils:setFieldInRecord(resendRequest, standardHeader,
+                           Utils:setFieldInRecord(resendRequest, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           resendRequest), ?MODULE:getNow()),
+                           TargetCompID)),
+                           BeginSeqNo), EndSeqNo).
+
+%% --------------------------------------------------------------------
+%% @doc Gets the message number
+%%
+%% @spec get_seq_number(TestRequest::#testRequest{}) -> int()
+%%
+%% @end
+%% --------------------------------------------------------------------
+get_seq_number(FixVersion, Message)->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    Header = erlang:element(2, Message),
+    D = Utils:get_record_def(standardHeader),
+    P = find_first(msgSeqNum, D),
+    TargetCompID = erlang:element(P, Header).
+
 
 %% --------------------------------------------------------------------
 %% @doc Gets the heartbeat message

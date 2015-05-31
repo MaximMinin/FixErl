@@ -52,7 +52,7 @@ start_link(Id, Host, Port, MaxReconnect, ReconnectTimeout) ->
 %% --------------------------------------------------------------------
 init({Port, Id}) ->
     Name = tcp_name(fixerl_tcp_acceptor_sup, Port),
-    {ok, {{one_for_all, 10, 10},
+    {ok, {{one_for_all, 0, 1},
           [{fixerl_tcp_acceptor_sup, {fixerl_tcp_acceptor_sup, start_link,
                                [Name, get_sup_id(Id)]},
             transient, infinity, supervisor, [fixerl_tcp_acceptor_sup]},
@@ -61,7 +61,7 @@ init({Port, Id}) ->
             transient, 100, worker, [fixerl_tcp_listener]}]}};
 init({Host, Port, MaxReconnect, ReconnectTimeout, Id}) ->
     Name = tcp_name(fixerl_tcp_acceptor_sup, Host, Port),
-    {ok, {{one_for_all, 10, 10},
+    {ok, {{one_for_all, 0, 1},
           [{fixerl_tcp_acceptor_sup, {fixerl_tcp_acceptor_sup, start_link,
                                [Name]},
             transient, infinity, supervisor, [fixerl_tcp_acceptor_sup]},

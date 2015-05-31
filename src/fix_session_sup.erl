@@ -45,5 +45,14 @@ init([S]) ->
           permanent,2000,supervisor,[tcp_listener_sup]},
     BChild = {fixerl_tcp_client_sup,{fixerl_tcp_client_sup, start_link,[S]},
           permanent,2000,supervisor,[fixerl_tcp_client_sup]},
-    {ok,{{one_for_all,0,1}, [AChild, BChild]}}.
+    CChild = {fixerl_stop_timer,{fixerl_stop_timer, start_link,
+                                 [S#session_parameter.id, 
+                                  S#session_parameter.reconnect_interval]},
+              permanent,
+              S#session_parameter.reconnect_interval*1000+1,
+              worker,[fixerl_stop_timer]},
+    {ok,{{one_for_all,
+          S#session_parameter.max_reconnect,
+          S#session_parameter.max_reconnect*S#session_parameter.reconnect_interval - 1},
+    [AChild, BChild, CChild]}}.
 

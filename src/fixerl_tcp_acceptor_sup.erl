@@ -47,11 +47,11 @@ start_link(Name, Id) ->
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 init([]) ->
-    {ok, {{simple_one_for_one, 10, 10},
+    {ok, {{simple_one_for_one, 0, 1},
           [{fixerl_tcp_acceptor, {fixerl_tcp_acceptor, start_link, []},
             transient, brutal_kill, worker, [fixerl_tcp_acceptor]}]}};
 init([Id]) ->
-    {ok, {{simple_one_for_one, 10, 10},
+    {ok, {{simple_one_for_one, 0, 1},
           [{fixerl_tcp_acceptor, {fixerl_tcp_acceptor, start_link, [Id]},
             transient, brutal_kill, worker, [fixerl_tcp_acceptor]}]}}.
 

@@ -20,7 +20,6 @@
 start(_StartType, _StartArgs) ->
     R = fixerl_root_sup:start_link(),
     case application:get_env(fixerl, sessions) of
-        undefined -> ok;
         {ok, []} -> ok;
         {ok, Sessions} ->
             lists:map(fun(S) ->

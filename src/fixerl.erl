@@ -52,6 +52,7 @@ start_session(SessionParams) ->
 %% @end
 %% --------------------------------------------------------------------
 stop_session(SessionId) ->
+    fixerl_stop_timer:deactivate_timeout(SessionId),
     fixerl_root_sup:stop_session(SessionId).
 
 %% --------------------------------------------------------------------

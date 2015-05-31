@@ -42,7 +42,9 @@ start_link(Session) ->
 start_child(Id, Arg) ->
     lager:info("STARTE TCP READER PID: ~p ", [whereis(Id)]),
     lager:info("STARTE TCP READER: ~p ~p", [Id, Arg]),
-    supervisor:start_child(Id, [Arg]).
+    {ok, Child} = supervisor:start_child(Id, [Arg]),
+    erlang:link(Child),
+    {ok, Child}.
 
 %% ====================================================================
 %% Server functions
@@ -54,6 +56,6 @@ start_child(Id, Arg) ->
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 init([Session]) ->
-    {ok, {{simple_one_for_one, 10, 10},
+    {ok, {{simple_one_for_one, 0, 1},
           [{fixerl_tcp_reader, {fixerl_tcp_reader,start_link,[Session]},
             permanent, 10, worker, [fixerl_tcp_reader]}]}}.
