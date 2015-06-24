@@ -66,7 +66,7 @@ get_tables_name(SessionId)->
 
 tables_exist(TableName) ->
     try
-        mnesia:table_info(TableName, [all]),
+        mnesia:table_info(TableName, all),
         true
     catch _:_ ->
               false
