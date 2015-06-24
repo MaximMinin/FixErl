@@ -19,6 +19,7 @@
 -define(MASTER, fixerl).
 -define(DUMMY, dummy).
 -define(ID_, fix_4_2_resend_properstatem_reply).
+-define(LOG(A, B), lager:info(A,B)).
 -record(state, {messages = []}).
 
 %%% Property
@@ -35,12 +36,12 @@ prop_master() ->
           Messages  = receive_messages(),
           erlang:unregister(?DUMMY),
           fix_4_2_resend_properstatem:clean(),
-%%          io:format("State:~p~n" ,[State#state.messages]),
-%%          io:format("Receive:~p~n",[Messages]),
-          io:format("Result:~p~n",[Result]),
+         ?LOG("State:~p~n" ,[State#state.messages]),
+         ?LOG("Receive:~p~n",[Messages]),
+          ?LOG("Result:~p~n",[Result]),
           true = check_messages(State#state.messages, Messages),
           ?WHENFAIL(
-            io:format("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
+            ?LOG("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
                [lists:sort(State#state.messages),lists:sort(Messages), History, State]),
          aggregate(command_names(Cmds), Result =:= ok))
       end)).
@@ -85,8 +86,6 @@ precondition(_S, {call,_,send,[_Name, Record]}) ->
         logon -> false;
         logout -> false;
         resendRequest -> false;
-        testRequest -> false;
-        heartbeat -> false;
         _ -> true
     end.
 
@@ -150,7 +149,7 @@ receive_messages(L) ->
   end.
 
 check_messages(L, L1) ->
-%%  io:format("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
+ ?LOG("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
     erlang:length(L) == erlang:length(L1).
 %% check_messages([],[]) -> ok;
 %% check_messages([M|R], [M1|R1]) ->

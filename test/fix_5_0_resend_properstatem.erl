@@ -87,8 +87,6 @@ precondition(_S, {call,_,send,[_Name, Record]}) ->
         logon -> false;
         logout -> false;
         resendRequest -> false;
-        testRequest -> false;
-        heartbeat -> false;
         _ -> true
     end.
 

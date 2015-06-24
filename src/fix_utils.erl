@@ -16,7 +16,8 @@
 %%
 %% Exported Functions
 %%
--export([get_logon/3, get_logout/3,
+-export([is_session_msg/2, get_sequence_reset/4,
+         get_logon/3, get_logout/3,
          check_logon/4, 
          get_heartbeat/3, get_heartbeat/2,
          get_numbers/2, get_seq_number/2,
@@ -27,6 +28,23 @@
 %% API Functions
 %% ====================================================================
 
+%% --------------------------------------------------------------------
+%% @doc Checks the logon message
+%%
+%% @spec is_session_msg(FixVersion::#fix_version{},
+%%                 Message::binary()) -> boolean()
+%% @end
+%% --------------------------------------------------------------------
+is_session_msg(FixVersion, Message) ->
+    {Record, _} = fix_convertor:fix2record(Message, FixVersion),
+    case erlang:element(1, Record) of
+        logon -> true;
+        testRequest -> true;
+        heartbeat -> true;
+        logout -> true;
+        resendRequest -> true;
+        _ -> false
+    end.
 %% --------------------------------------------------------------------
 %% @doc Checks the logon message
 %%
@@ -53,6 +71,33 @@ check_logon(FixVersion, Logon,
             nok
     end.
 
+%% --------------------------------------------------------------------
+%% @doc Gets the sequenceReset message
+%%
+%% @spec get_sequence_reset(FixVersion::, fix_version(),
+%%                          SenderCompID::binary(), 
+%%                          TargetCompID::binary(),
+%%                          NewSeqNo::int()) -> #sequenceReset{}
+%% @end
+%% --------------------------------------------------------------------
+get_sequence_reset(FixVersion, SenderCompID, TargetCompID, NewSeqNo) ->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:getRecord(sequenceReset),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    R = 
+    Utils:setFieldInRecord(sequenceReset, gapFillFlag,
+    Utils:setFieldInRecord(sequenceReset, newSeqNo,
+    Utils:setFieldInRecord(sequenceReset, standardHeader,
+                           Utils:setFieldInRecord(sequenceReset, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           sequenceReset), ?MODULE:getNow()), TargetCompID)),
+                           NewSeqNo+1), gapFillMessage),
+    fix_convertor:set_msg_seqnum(R, NewSeqNo, FixVersion).
 
 %% --------------------------------------------------------------------
 %% @doc Gets the logout message

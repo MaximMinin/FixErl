@@ -242,7 +242,16 @@ process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
             lists:map(fun(Num) -> 
                 case  mnesia:dirty_read({Tout, Num}) of
                     [{Tout, Num, ResendMessage}] ->
-                        fix_gateway:resend(FixSender, ResendMessage);
+                        case fix_utils:is_session_msg(FixVersion, ResendMessage) of
+                            false ->
+                                fix_gateway:resend(FixSender, ResendMessage);
+                            true ->
+                                GapMsg = fix_utils:get_sequence_reset(FixVersion,
+                                                                      SenderCompID,
+                                                                      TargetCompID,
+                                                                      Num),
+                                fix_gateway:resend(FixSender, GapMsg)
+                        end;
                     [] -> ok
                 end end, 
                  fix_utils:get_numbers(FixVersion, Msg));

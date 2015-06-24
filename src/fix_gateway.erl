@@ -125,6 +125,20 @@ handle_call(send_heartbeat, _From,
             lager:error("~p", [Error])
     end,
     {reply, ok, State#state{count = NewCount}};
+handle_call({resend, Msg}, _From, #state{socket = Socket,
+                                         fix_version = FixVersion,
+                                         id = Id} = State)
+            when is_tuple(Msg)->
+    try 
+    Bin = fix_convertor:record2fix(Msg, 
+                                   FixVersion), 
+        gen_tcp:send(Socket, Bin),
+        lager:info([{session, Id}], " resend -> ~p", 
+                   [Bin])
+    catch error:Error -> 
+            lager:error("~p", [Error])
+    end,
+    {reply, ok, State};
 handle_call({resend, Bin}, _From, #state{socket = Socket,
                                          id = Id} = State) ->
     try 
@@ -147,9 +161,9 @@ handle_call({send, Record, NotStandardPart}, _From,
     Bin = fix_convertor:record2fix(NewRecord, 
                                    NotStandardPart,
                                    FixVersion), 
+    gen_tcp:send(Socket, Bin),
     mnesia:transaction(fun() -> 
         mnesia:write({T, NewCount , Bin}) end),
-    gen_tcp:send(Socket, Bin),
     lager:info([{session, Id}], " -> ~p", 
                [fix_convertor:format(NewRecord, FixVersion)]),
     {reply, ok, State#state{count = NewCount}};
