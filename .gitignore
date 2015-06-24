@@ -8,6 +8,7 @@ rebar
 *.plt
 .project
 .settings
+.rebar
 rel/fixerl
 rel/files
 .gitignore
