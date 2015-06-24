@@ -65,7 +65,7 @@ init([Socket, FixVersion,
       OutTable, undefined, Id]) ->
     lager:md([{session, Id}]),
     {{Y,M,D},_} = erlang:universaltime(),
-    lager:trace_file(lists:concat(["log/session_", Id,"_",
+    lager:trace_file(lists:concat(["fixlog/session_", Id,"_",
                                    Y,M,D,".log"]),
                                   [{session, Id}], info),
     case mnesia:table_info(OutTable, size) of
@@ -84,7 +84,7 @@ init([Socket, FixVersion,
       OutTable, StartSeqNum, Id]) ->
     lager:md([{session, Id}]),
     {{Y,M,D},_} = erlang:universaltime(),
-    lager:trace_file(lists:concat(["log/session_", Id,"_",
+    lager:trace_file(lists:concat(["fixlog/session_", Id,"_",
                                    Y,M,D,".log"]),
                                   [{session, Id}], info),
     {ok, #state{socket = Socket, count = StartSeqNum, 

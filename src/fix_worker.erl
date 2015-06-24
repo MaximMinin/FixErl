@@ -32,6 +32,10 @@
     lager:info([{session, Id}],
                FormatString, Args)).
 
+-define(LOG_DEV(Id, FormatString, Args),
+    lager:debug([{session, Id}],
+               FormatString, Args)).
+
 %% ====================================================================
 %% External functions
 %% ====================================================================
@@ -68,7 +72,7 @@ init([Pid, FixSender, Session]) ->
     Id = Session#session_parameter.id,
     lager:md([{session, Id}]),
     {{Y,M,D},_} = erlang:universaltime(),
-    lager:trace_file(lists:concat(["log/session_", Id,"_",
+    lager:trace_file(lists:concat(["fixlog/session_", Id,"_",
                                    Y,M,D,".log"]),
                                   [{session, Id}], info),
     TableNames = fixerl_mnesia_utils:get_tables_name(Id),
@@ -139,7 +143,7 @@ handle_cast({message, {Msg, NotStandardFields}},
                 process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
                             SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
                             CheckCompIds, State#state.count + 1),
-                ?LOG(Id, "session is ok", []),
+                ?LOG_DEV(Id, "session is ok", []),
                 {false, State#state.count + 1, undefined, undefined};
         {true, true, false, true} -> 
                 process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
