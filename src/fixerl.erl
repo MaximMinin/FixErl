@@ -64,6 +64,7 @@ stop_session(SessionId) ->
 %% --------------------------------------------------------------------
 reset_session(SessionId) ->
     P = fix_worker:get_session_parameter(SessionId),
+    fixerl_stop_timer:deactivate_timeout(SessionId),
     fixerl_root_sup:stop_session(SessionId),
     fixerl_mnesia_utils:clear_table(SessionId),
     fixerl_root_sup:start_session(P).
