@@ -66,9 +66,11 @@ start_session(#session_parameter{id=Id}=S) ->
 %% --------------------------------------------------------------------
 stop_session(SessionId) ->
     lager:info("Stop session: ~p - ~p",[SessionId, whereis(SessionId)]),
-    case whereis(SessionId) of
+    S = list_to_atom(lists:concat([SessionId, "_",fix_session_sup])),
+    case whereis(S) of
         Pid when erlang:is_pid(Pid) ->
-            supervisor:terminate_child(?MODULE, Pid);
+            R = supervisor:terminate_child(?MODULE, Pid),
+            lager:info("Stop session :~p ~p", [SessionId, R]);
         _Else ->
             lager:error("Session not found: ~p ",[SessionId]),
             {error, not_found}
