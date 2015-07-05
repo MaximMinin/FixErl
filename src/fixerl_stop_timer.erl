@@ -23,7 +23,13 @@ start_link(Id, Timeout) ->
     gen_server:start_link({local, ?SERVER(Id)}, ?MODULE, [Timeout, Id], []).
 
 deactivate_timeout(Id) ->
-    gen_server:call(?SERVER(Id), deactivate_timeout).
+    Name = ?SERVER(Id),
+    case erlang:whereis(Name) of
+        Pid when is_pid(Pid) ->
+            gen_server:call(Name, deactivate_timeout);
+        _Else ->
+            ok
+    end.
     
 
 %% init/1
@@ -60,12 +66,9 @@ init([Timeout, Id]) ->
 	Timeout :: non_neg_integer() | infinity,
 	Reason :: term().
 %% ====================================================================
-handle_call(deactivate_timeout, From, State) ->
+handle_call(deactivate_timeout, _From, State) ->
     Reply = ok,
-    {reply, Reply, State#state{flag = true}};
-handle_call(Request, From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+    {reply, Reply, State#state{flag = true}}.
 
 
 %% handle_cast/2
@@ -79,7 +82,7 @@ handle_call(Request, From, State) ->
 	NewState :: term(),
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
-handle_cast(Msg, State) ->
+handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
@@ -94,7 +97,7 @@ handle_cast(Msg, State) ->
 	NewState :: term(),
 	Timeout :: non_neg_integer() | infinity.
 %% ====================================================================
-handle_info(Info, State) ->
+handle_info(_Info, State) ->
     {noreply, State}.
 
 
@@ -108,10 +111,11 @@ handle_info(Info, State) ->
 			| term().
 %% ====================================================================
 terminate(Reason, #state{flag = true, id = Id}) ->
-    lager:info("STOP SESSION ~p NOW", [Id]),
+    lager:debug("STOP SESSION ~p NOW: ~p", [Id, Reason]),
     ok;
 terminate(Reason, #state{timeout = Timeout, id = Id}) ->
-    lager:info("STOP SESSION ~p AFTER ~p SEC.", [Id, Timeout]),
+    lager:info("session ~p will be closed after ~p sec.: ~p",
+               [Id, Timeout,Reason]),
     timer:sleep(Timeout*1000),
     ok.
 
@@ -124,7 +128,7 @@ terminate(Reason, #state{timeout = Timeout, id = Id}) ->
 	OldVsn :: Vsn | {down, Vsn},
 	Vsn :: term().
 %% ====================================================================
-code_change(OldVsn, State, Extra) ->
+code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
