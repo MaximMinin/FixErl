@@ -16,7 +16,8 @@
 %%
 %% Exported Functions
 %%
--export([is_session_msg/2, get_sequence_reset/4,
+-export([is_msg_to_skip/3, get_sequence_reset/4,
+         get_reset_atr/2,
          get_logon/3, get_logout/3,
          check_logon/4, 
          get_heartbeat/3, get_heartbeat/2,
@@ -35,16 +36,11 @@
 %%                 Message::binary()) -> boolean()
 %% @end
 %% --------------------------------------------------------------------
-is_session_msg(FixVersion, Message) ->
+is_msg_to_skip(FixVersion, Message, List) ->
     {Record, _} = fix_convertor:fix2record(Message, FixVersion),
-    case erlang:element(1, Record) of
-        logon -> true;
-        testRequest -> true;
-        heartbeat -> true;
-        logout -> true;
-        resendRequest -> true;
-        _ -> false
-    end.
+    Type = erlang:element(1, Record),
+    lists:member(Type, List).
+
 %% --------------------------------------------------------------------
 %% @doc Checks the logon message
 %%
@@ -255,9 +251,9 @@ get_heartbeat(FixVersion, TestRequest)->
     Utils:setFieldInRecord(standardHeader, targetCompID, 
     Utils:setFieldInRecord(standardHeader, sendingTime, 
     Utils:setFieldInRecord(standardHeader, msgType, 
-    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, TargetCompID),
                            heartbeat), ?MODULE:getNow()),
-                           TargetCompID)),
+                           SenderCompID)),
                            TestReqID).
     
 %% --------------------------------------------------------------------
@@ -278,6 +274,23 @@ get_numbers(FixVersion, ResendRequest) ->
              erlang:element(P2, ResendRequest));
         false -> []
     end.
+
+%% --------------------------------------------------------------------
+%% @doc Gets the list of message numbers to be resend
+%%
+%% @spec get_reset_atr(FixVersion::fix_version(), 
+%%                     SequenceReset::#sequenceReset{})
+%%      -> {integer(), atom()}
+%%
+%% @end
+%% --------------------------------------------------------------------
+get_reset_atr(FixVersion, SequenceReset) ->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:get_record_def(sequenceReset),
+    P1 = find_first(newSeqNo, L),
+    P2 = find_first(gapFillFlag, L),
+    {erlang:element(P1, SequenceReset),
+     erlang:element(P2, SequenceReset)}.
     
 %% --------------------------------------------------------------------
 %% @doc Gets timestamp (now + AddTimeInSec) in fix format 

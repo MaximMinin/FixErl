@@ -16,17 +16,16 @@
 -include("fixerl.hrl").
 %% --------------------------------------------------------------------
 %% External exports
--export([start_link/3, newMessage/2, getMessages/3, 
-         get_session_parameter/1]).
+-export([start_link/3, newMessage/2, 
+         get_session_parameter/1, get_message_count/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, 
         handle_info/2, terminate/2, code_change/3]).
 
--record(state, {callback, pid, fixSender, count = 0, 
-                senderCompID, targetCompID, role, session_id,
-                mnesia_tables_name, fix_version, mode,
-                session_params, sync_flag = false, diff, diff_count}).
+-record(state, {pid, fixSender, count = 0, login, 
+                mnesia_tables_name, session_params,
+                sync_flag = false,diff, diff_count}).
 
 -define(LOG(Id, FormatString, Args),
     lager:info([{session, Id}],
@@ -35,6 +34,11 @@
 -define(LOG_DEV(Id, FormatString, Args),
     lager:debug([{session, Id}],
                FormatString, Args)).
+-define(LOG_ERROR(Id, FormatString, Args),
+    lager:error([{session, Id}],
+               FormatString, Args)).
+
+-define(LOGOUT_TIMEOUT, 500).
 
 %% ====================================================================
 %% External functions
@@ -48,13 +52,14 @@ start_link(Pid, FixSender, Session) ->
 newMessage(Pid, Message)->
     gen_server:cast(Pid, {message, Message}).
 
-getMessages(Pid, From, To) ->
-    gen_server:call(Pid, {getMessages, From, To}).
-
 get_session_parameter(SessionId) ->
     Name = erlang:list_to_atom(lists:concat([?MODULE,  SessionId])),
     lager:info("get_session_parameter call ~p:~p", [Name, whereis(Name)]),
     gen_server:call(Name, get_session_parameter).
+
+get_message_count(SessionId) ->
+    Name = erlang:list_to_atom(lists:concat([?MODULE,  SessionId])),
+    gen_server:call(Name, get_message_count).
 
 %% ====================================================================
 %% Server functions
@@ -80,15 +85,8 @@ init([Pid, FixSender, Session]) ->
     case mnesia:table_info(In, size) of
         C when erlang:is_integer(C) -> 
             State = #state{session_params = Session,
-                           fix_version = Session#session_parameter.fix_version,
                            pid = Pid, 
                            fixSender = FixSender,
-                           session_id = Id, 
-                           senderCompID = Session#session_parameter.senderCompId,
-                           targetCompID = Session#session_parameter.targetCompId, 
-                           callback = Session#session_parameter.callback,
-                           role = Session#session_parameter.role,
-                           mode = Session#session_parameter.callback_mode,
                            mnesia_tables_name = TableNames,
                           count = C},
             {ok, State};
@@ -106,13 +104,10 @@ init([Pid, FixSender, Session]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call(get_message_count, _From, State) ->
+    {reply, State#state.count, State};
 handle_call(get_session_parameter, _From, State) ->
-    {reply, State#state.session_params, State};
-handle_call({getMessages, _From, _To}, _From, State) ->
-    ToReturn = ok, %%TODO
-    {reply, ToReturn, State};
-handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
+    {reply, State#state.session_params, State}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -123,41 +118,41 @@ handle_call(_Request, _From, State) ->
 %% --------------------------------------------------------------------
 handle_cast({message, {Msg, NotStandardFields}}, 
              #state{pid = Pid, fixSender = FixSender, 
-                                   fix_version = FixVersion,
-                                   senderCompID = SenderCompID, 
-                                   targetCompID = TargetCompID,
-                                   callback = {M,F}, 
-                                   role = Role, 
-                                   session_id = Id,
-                                   mode = Mode,
+                                   session_params = Session,                        
                                    mnesia_tables_name = [Tin,Tout]} = State) ->
+    FixVersion = Session#session_parameter.fix_version,
+    SenderCompID = Session#session_parameter.senderCompId,
+    TargetCompID = Session#session_parameter.targetCompId, 
+    Id = Session#session_parameter.id, 
+%%     Callback = Session#session_parameter.callback,
+%%     Role = Session#session_parameter.role,
+%%     Mode = Session#session_parameter.callback_mode,
     ?LOG(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]),
     CheckMsgSeqNum = ((State#state.session_params)#session_parameter.message_checks)#message_checks.check_msgSeqNum,
-    CheckCompIds = ((State#state.session_params)#session_parameter.message_checks)#message_checks.check_CompIds,
     SyncFlagOld = State#state.sync_flag,
     InC = fix_utils:get_seq_number(FixVersion, Msg),
     C = State#state.count + 1,
     {SyncFlag, NewC, Diff, DiffCount} = 
     case {SyncFlagOld, InC == C, InC < C, CheckMsgSeqNum} of
         {false, true, false, _} -> 
-                process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
-                            SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
-                            CheckCompIds, State#state.count + 1),
+                PrMsgNum = process_msg(Msg, NotStandardFields, Pid, FixSender, Tin, Tout,
+                                       State#state.count + 1, State#state.session_params,
+                                       State#state.login),
                 ?LOG_DEV(Id, "session is ok", []),
-                {false, State#state.count + 1, undefined, undefined};
+                {false, State#state.count + PrMsgNum, undefined, undefined};
         {true, true, false, true} -> 
-                process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
-                            SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
-                            CheckCompIds, State#state.count + 1),
+                PrMsgNum = process_msg(Msg, NotStandardFields, Pid, FixSender, Tin, Tout,
+                                       State#state.count + 1, State#state.session_params,
+                                       State#state.login),
                 case State#state.diff > State#state.diff_count of
                     false ->
                         ?LOG(Id, "session is sync again", []),
-                        {false, State#state.count + 1, 
+                        {false, State#state.count + PrMsgNum, 
                          undefined, undefined};
                     true ->
                         ?LOG(Id, "session sync run: ~p ~p", [State#state.diff , State#state.diff_count]),
-                        {true, State#state.count + 1, 
-                         State#state.diff , State#state.diff_count +1}
+                        {true, State#state.count + PrMsgNum, 
+                         State#state.diff , State#state.diff_count + PrMsgNum}
                 end;
         {false, false, true, true} ->
                 ?LOG(Id, "msgSeqNum too low - accepted: ~p received: ~p ",
@@ -168,11 +163,21 @@ handle_cast({message, {Msg, NotStandardFields}},
                                         TargetCompID)),
                 erlang:exit(msg_seq_num_too_low);
         {true, false, true, true} ->
-                    process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
-                                SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
-                                CheckCompIds, State#state.count + 1),
-                    {true, State#state.count + 1, State#state.diff , State#state.diff_count +1};
+                    PrMsgNum = process_msg(Msg, NotStandardFields, Pid, FixSender, Tin, Tout,
+                                		   State#state.count + 1, State#state.session_params,
+                                           State#state.login),
+                    {true, State#state.count + PrMsgNum, State#state.diff , State#state.diff_count +PrMsgNum};
         {false, false, false, true} ->
+            case erlang:element(1, Msg) == logon andalso
+                     State#state.login == undefined  of
+                true ->
+            ?LOG(Id, " logon whith wrong number: accepted msgSeqNum: ~p received: ~p.",
+                [C, InC]),
+                    process_msg(Msg, NotStandardFields, Pid, FixSender, Tin, Tout,
+                                State#state.count + 1, State#state.session_params,
+                                State#state.login);
+                false -> ok
+            end,
             ?LOG(Id, " accepted msgSeqNum: ~p received: ~p send resend request",
                 [C, InC]),
             fix_gateway:send(FixSender,
@@ -185,26 +190,35 @@ handle_cast({message, {Msg, NotStandardFields}},
                 [C, InC]),
             {true, State#state.count, State#state.diff , State#state.diff_count};
         {_, _, _, false} ->
-            process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
-                        SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
-                        CheckCompIds, State#state.count + 1),
+            PrMsgNum = process_msg(Msg, NotStandardFields, Pid, FixSender, Tin, Tout,
+                        		   State#state.count + 1, State#state.session_params,
+                                   State#state.login),
             ?LOG(Id, " accepted msgSeqNum: ~p received: ~p",
                 [C, InC]),
-            {false, State#state.count, undefined, undefined};
+            {false, State#state.count + PrMsgNum, undefined, undefined};
         Else ->
             ?LOG(Id, " Something is wrong: ~p ", [Else]),
             erlang:exit(todo)
     end,
-    {noreply, State#state{count = NewC, 
+    NewLogin=
+    case erlang:element(1, Msg) of
+        logon -> erlang:now();
+        _ -> State#state.login
+    end,
+    {noreply, State#state{count = NewC, login = NewLogin,
                           sync_flag = SyncFlag, diff = Diff, diff_count = DiffCount}}.
 
-process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
-            SenderCompID, TargetCompID, M, F, Role, Id, Mode, Tin, Tout,
-            CheckCompIds, C) ->
-    mnesia:transaction(fun() ->
+process_msg(Msg, _NotStandardFields, Pid, FixSender, Tin, _Tout, C, Parameter, undefined) ->
+        mnesia:transaction(fun() ->
         mnesia:write({Tin, C , Msg}) end),
+    FixVersion = Parameter#session_parameter.fix_version,
+    SenderCompID = Parameter#session_parameter.senderCompId,
+    TargetCompID = Parameter#session_parameter.targetCompId,
+    Role = Parameter#session_parameter.role,
+    Id = Parameter#session_parameter.id,
+    CheckCompIds = Parameter#session_parameter.message_checks#message_checks.check_CompIds,
+    LogonCallback = Parameter#session_parameter.logon_callback,
     case erlang:element(1, Msg) of
-        %%TODO sessionhandling
         logon -> 
             case not CheckCompIds orelse ok == fix_utils:check_logon(FixVersion,
                                        Msg, 
@@ -219,30 +233,56 @@ process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
                                                        TargetCompID));
                         initiator -> ok
                     end,
-                    Pid ! fix_starting;
+                    Pid ! fix_starting,
+                    case LogonCallback of
+                        {M, F} -> M:F();
+                        _ -> ok
+                    end,
+                    ok;
                 false -> 
                     fix_gateway:send(FixSender,
                         fix_utils:get_logout(FixVersion,
                                             SenderCompID,
                                             TargetCompID)),
+                    timer:sleep(?LOGOUT_TIMEOUT),
                     erlang:exit(false_logon)
-            end;
+            end, 1;
+        _Else ->
+            ?LOG(Id, "not logged - session ~p will be closed", [Id]),
+            erlang:exit(not_logged)
+    end;
+process_msg(Msg, NotStandardFields, _Pid, FixSender, Tin, Tout, C, Parameter, _Login) ->
+	FixVersion = Parameter#session_parameter.fix_version,
+    SenderCompID = Parameter#session_parameter.senderCompId,
+	TargetCompID = Parameter#session_parameter.targetCompId,
+	Skips = Parameter#session_parameter.skip_by_resend_request,
+	{M,F} = Parameter#session_parameter.callback,
+	Id = Parameter#session_parameter.id,
+	Mode = Parameter#session_parameter.callback_mode,
+    mnesia:transaction(fun() ->
+        mnesia:write({Tin, C , Msg}) end),
+    case erlang:element(1, Msg) of
+        logon -> 
+            ?LOG_ERROR(Id, "late logon received", []),
+            1;
         testRequest -> 
             fix_gateway:send(FixSender,
                              fix_utils:get_heartbeat(FixVersion,
-                                                     Msg));
-        heartbeat -> ok;
+                                                     Msg)),
+            1;
+        heartbeat -> 1;
         logout ->
             fix_gateway:send(FixSender,
                 fix_utils:get_logout(FixVersion,
                                      SenderCompID,
                                      TargetCompID)),
+            timer:sleep(?LOGOUT_TIMEOUT),
             erlang:exit(fix_session_close);
         resendRequest ->
             lists:map(fun(Num) -> 
                 case  mnesia:dirty_read({Tout, Num}) of
                     [{Tout, Num, ResendMessage}] ->
-                        case fix_utils:is_session_msg(FixVersion, ResendMessage) of
+                        case fix_utils:is_msg_to_skip(FixVersion, ResendMessage, Skips) of
                             false ->
                                 fix_gateway:resend(FixSender, ResendMessage);
                             true ->
@@ -254,14 +294,24 @@ process_msg(Msg, NotStandardFields, Pid, FixSender, FixVersion,
                         end;
                     [] -> ok
                 end end, 
-                 fix_utils:get_numbers(FixVersion, Msg));
+                 fix_utils:get_numbers(FixVersion, Msg)),
+            1;
+        sequenceReset ->
+            {NextNumber, _GapFillMessage} = fix_utils:get_reset_atr(FixVersion, Msg),
+            S = lists:seq(C+1, erlang:max(NextNumber-1,C+1)) -- [C+1],
+            lists:map(fun(Num) -> 
+                              mnesia:transaction(fun() ->
+                                                         mnesia:write({Tin, Num , Msg})
+                                                 end)
+                      end, S),
+            erlang:length(S)+1 ;
         _Else ->
             case Mode of
                 all -> 
                     M:F(Id, Msg, NotStandardFields);
                 _Standard ->
                     M:F(Id, Msg)
-            end
+            end, 1
     end.
 
 %% --------------------------------------------------------------------

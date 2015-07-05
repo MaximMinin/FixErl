@@ -11,10 +11,12 @@
                              role :: 'acceptor' | 'initiator',
                              callback :: {Module :: atom(), Function :: atom()},
                              callback_mode :: standard | all,
+                             logon_callback :: {Module :: atom(), Function :: atom()},
                              fix_version :: fix_version(),
                              start_seqnum :: pos_integer(),
                              heartbeatInterval :: pos_integer(),
                              senderCompId :: string(),
                              targetCompId :: string(),
+                             skip_by_resend_request = [logon, testRequest, heartbeat, logout, sequenceReset, resendRequest],
                              message_checks = #message_checks{} ::  #message_checks{}
                            }).
