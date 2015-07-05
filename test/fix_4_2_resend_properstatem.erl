@@ -5,21 +5,11 @@
 
 -behaviour(proper_statem).
 
--include_lib("proper/include/proper.hrl").
--include("fixerl.hrl").
+-include("fixerl_proper.hrl").
 -include_lib("fix_convertor/include/FIX_4_2.hrl").
 
--compile([{no_auto_import, [date/0, time/0]}, 
-          export_all, debug_info]).
--export([initial_state/0, next_state/3,
-         precondition/2,postcondition/3,
-         command/1]).
-
 -define(FIX_VERSION, 'FIX 4.2').
--define(MASTER, fixerl).
--define(DUMMY, dummy).
 -define(ID_, fix_4_2_resend_properstatem_reply).
--define(LOG(A, B), lager:info(A,B)).
 -record(state, {messages = []}).
 
 %%% Property
@@ -31,30 +21,34 @@ prop_master() ->
       begin
           fix_4_2_resend_properstatem:setup(),
           erlang:register(?DUMMY, self()),
-          timer:sleep(200),
+          wait_for_logon(),
           {History, State, Result} = run_commands(?MODULE, Cmds),
           Messages  = receive_messages(),
           erlang:unregister(?DUMMY),
           fix_4_2_resend_properstatem:clean(),
          ?LOG("State:~p~n" ,[State#state.messages]),
          ?LOG("Receive:~p~n",[Messages]),
+          ?LOG("HEADERS OUT: ~p", [[erlang:element(1, M) ||M <- State#state.messages]]),
+          ?LOG("HEADERS  IN: ~p", [[erlang:element(1, M) ||M <- Messages]]),
           ?LOG("Result:~p~n",[Result]),
-          true = check_messages(State#state.messages, Messages),
+          R = check_messages(State#state.messages, Messages),
           ?WHENFAIL(
-            ?LOG("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
-               [lists:sort(State#state.messages),lists:sort(Messages), History, State]),
-         aggregate(command_names(Cmds), Result =:= ok))
+            ?EMERGENCY("ERROR ~p State:~p~n****Receive:~p~n****History: ~w\n****State: ~w\n",
+               [?ID_, lists:sort(State#state.messages),lists:sort(Messages), History, State]),
+         aggregate(command_names(Cmds), Result =:= ok
+                  %% andalso R == true
+                  ))
       end)).
 
 initial_state() ->
     #state{}.
 
 command(#state{messages = []}) ->
-    {call,?MASTER,send,[?ID_, fix_4_2_record_generator:test_record()]};
-command(#state{}) ->
+    {call,fixerl,send,[?ID_, fix_4_2_record_generator:test_record()]};
+command(#state{messages = M}) ->
     oneof([
-           {call,?MASTER,send,[?ID_, fix_4_2_record_generator:test_record()]},
-           {call,?MASTER,send,[?MODULE, fix_4_2_record_generator:resend_record()]}
+           {call,fixerl,send,[?ID_, fix_4_2_record_generator:test_record()]},
+           {call,fixerl,send,[?MODULE, fix_4_2_record_generator:resend_record(M)]}
           ]).
 
 next_state(S, _V, {call,_,send,[?MODULE, Record]}) ->
@@ -64,7 +58,7 @@ next_state(S, _V, {call,_,send,[?MODULE, Record]}) ->
             [A|_] = L,
             E = lists:last(L),
             Resended = lists:sublist(S#state.messages, A, E-A+1),
-            lager:info("RESEND: ~p", [Resended]),
+            ?LOG("RESEND: ~p", [Resended]),
             S#state{messages = lists:append(S#state.messages, Resended)}
     end;
 next_state(S, _V, {call,_,send,[?ID_, Record]}) ->
@@ -84,7 +78,10 @@ precondition(S, {call,_,send,[?MODULE, Record]}) ->
 precondition(_S, {call,_,send,[_Name, Record]}) ->
     case erlang:element(1, Record) of
         logon -> false;
+        heartbeat -> false;
         logout -> false;
+        testRequest -> false;
+        sequenceReset -> false;
         resendRequest -> false;
         _ -> true
     end.
@@ -99,8 +96,9 @@ setup() ->
     Ret = fixerl:start(),
     S1 = #session_parameter{
                              id = ?ID_, 
-                             port = 23451,  
-                             senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
+                             port = 11118,  
+                             senderCompId = "TEST1", targetCompId = "TEST",
+                             fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = acceptor, 
                              message_checks = #message_checks{check_msgSeqNum = false},
                              callback = {?MODULE, callback1}
@@ -108,12 +106,16 @@ setup() ->
     fixerl:start_session(S1),
     S = #session_parameter{
                              id = ?MODULE, 
-                             host = localhost, port = 23451, max_reconnect = 10, reconnect_interval = 20, 
-                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
+                             host = localhost, port = 11118,
+                             max_reconnect = 10, reconnect_interval = 20, 
+                             senderCompId = "TEST", targetCompId = "TEST1",
+                             fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = initiator, 
                              message_checks = #message_checks{check_msgSeqNum = false},
-                             callback = {?MODULE, callback}
+                             callback = {?MODULE, callback}, 
+                             logon_callback = {?MODULE, logon_succeeded}
                            },
+    
     fixerl:start_session(S),
     Ret.
 
@@ -138,6 +140,14 @@ callback(_Id, M) ->
 callback1(_Id, _M) ->
     ok.
 
+logon_succeeded()->
+    ?DUMMY ! logon_succeeded.
+
+wait_for_logon() ->
+    receive
+        logon_succeeded -> ok
+    end.
+
 receive_messages() ->
     receive_messages([]).
 
@@ -145,14 +155,9 @@ receive_messages(L) ->
   receive
      M->
          receive_messages([M|L])
-  after 500 -> L
+  after 50 -> L
   end.
 
 check_messages(L, L1) ->
  ?LOG("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
     erlang:length(L) == erlang:length(L1).
-%% check_messages([],[]) -> ok;
-%% check_messages([M|R], [M1|R1]) ->
-%%     true = fix_4_2_record_generator:is_eq(M, M1),
-%%     check_messages(R, R1).
-

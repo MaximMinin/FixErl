@@ -5,18 +5,9 @@
 
 -behaviour(proper_statem).
 
--include_lib("proper/include/proper.hrl").
--include("fixerl.hrl").
-
--compile([{no_auto_import, [date/0, time/0]}, 
-          export_all, debug_info]).
--export([initial_state/0, next_state/3,
-         precondition/2,postcondition/3,
-         command/1]).
+-include("fixerl_proper.hrl").
 
 -define(FIX_VERSION, 'FIX 4.2').
--define(MASTER, fixerl).
--define(DUMMY, dummy).
 
 -record(state, {messages = [],messages1 = []}).
 
@@ -34,7 +25,7 @@ prop_master() ->
           check_messages(State#state.messages, Messages),
           check_messages(State#state.messages1, Messages1),
           ?WHENFAIL(
-            io:format("History: ~w\n State: ~w\n",
+            ?EMERGENCY("History: ~w\n State: ~w\n",
                [History, State]),
          aggregate(command_names(Cmds), Result =:= ok))
       end)).
@@ -44,8 +35,8 @@ initial_state() ->
 
 command(#state{}) ->
     oneof([
-           {call,?MASTER,send,[test1, fix_4_2_record_generator:test_record()]},
-           {call,?MASTER,send,[test, fix_4_2_record_generator:test_record(), 
+           {call,fixerl,send,[test1, fix_4_2_record_generator:test_record()]},
+           {call,fixerl,send,[test, fix_4_2_record_generator:test_record(), 
                               fix_4_2_record_generator:fix_binary()]}
           ]).
 
@@ -78,7 +69,10 @@ next_state(S, _V, {call,_,send,[_Name, Record]}) ->
 precondition(_S, {call,_,send,[test, Record, _Bin]}) ->
     case erlang:element(1, Record) of
         logon -> false;
+        heartbeat -> false;
         logout -> false;
+        testRequest -> false;
+        sequenceReset -> false;
         resendRequest -> false;
         _ -> true
     end;
@@ -86,10 +80,13 @@ precondition(_S, {call,_,send,[test, Record, _Bin]}) ->
 precondition(_S, {call,_,send,[_Name, Record]}) ->
     case erlang:element(1, Record) of
         logon -> false;
+        heartbeat -> false;
         logout -> false;
+        testRequest -> false;
+        sequenceReset -> false;
         resendRequest -> false;
-        _ -> true
-    end.
+         _ -> true
+   end.
 
 postcondition(_S, {call,_,send,[_Name, _Record, _Bin]}, _Result) ->
     true;
@@ -99,22 +96,26 @@ postcondition(_S, {call,_,send,[_Name, _Record]}, _Result) ->
 setup() ->
     mnesia:delete_schema([node()|nodes()]),
     mnesia:create_schema([node()|nodes()]),
+    application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
-    lager:set_loglevel(lager_console_backend, notice),
+    lager:set_loglevel(lager_console_backend, emergency),
     fixerl_mnesia_utils:init(),
     Ret = fixerl:start(),
     S1 = #session_parameter{
                              id = test1, 
-                             port = 12345,  
-                             senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
+                             port = 11119,  
+                             senderCompId = "TEST1", targetCompId = "TEST",
+                             fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = acceptor,
                              callback = {?MODULE, callback1}
                            },
     fixerl:start_session(S1),
     S = #session_parameter{
                              id = test, 
-                             host = localhost, port = 12345, max_reconnect = 10, reconnect_interval = 20, 
-                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
+                             host = localhost, port = 11119, max_reconnect = 10,
+                             reconnect_interval = 20, 
+                             senderCompId = "TEST", targetCompId = "TEST1",
+                             fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = initiator,
                              callback = {?MODULE, callback}
                            },
@@ -145,7 +146,7 @@ receive_messages(L, L1) ->
          receive_messages([M|L], L1);
      {test1, M}->
          receive_messages(L, [M|L1])
-  after 300 -> {L, L1}
+  after 50 -> {L, L1}
   end.
 
 check_messages([],[]) -> ok;

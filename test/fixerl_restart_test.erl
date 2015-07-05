@@ -6,15 +6,15 @@
 %%
 %% Include files
 %%
--include_lib("eunit/include/eunit.hrl").
--include("fixerl.hrl").
+-include("fixerl_test.hrl").
 
 %%
 %% Exported Functions
 %%
--compile([export_all]).
 
 -define(FIX_VERSION, 'FIX 5.0').
+-define(ID_1, fixerl_restart_test_out).
+-define(ID_2, fixerl_restart_test_in).
 
 %%
 %% API Functions
@@ -30,35 +30,39 @@ test_run() ->
     setup(),
     timer:sleep(5000),
     try
-    fixerl:send(heartbeat1, bla)
-    catch Err:F  -> lager:info("ENDE ~p  ~p", [Err, F])
+    fixerl:send(?ID_2, {bla})
+    catch Err:F  -> ?LOG("ENDE ~p  ~p", [Err, F])
     end,
-    timer:sleep(3500),
+    timer:sleep(5000),
+    R = whereis(?ID_1) =/= undefined
+    andalso whereis(?ID_2) =/= undefined,
     clean(),
-    true.
+    R.
 
 setup() ->
     mnesia:stop(),
-    mnesia:delete_schema([node()|nodes()]),
-    mnesia:create_schema([node()|nodes()]),
+    mnesia:delete_schema([node()]),
+    mnesia:create_schema([node()]),
+    application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
-    lager:set_loglevel(lager_console_backend, notice),
+    lager:set_loglevel(lager_console_backend, emergency),
     fixerl_mnesia_utils:init(),
     ok = application:start(fixerl),
     start_sessions().
 
 start_sessions() ->
     start_sessions_2(),
-%%     timer:sleep(200),
     start_sessions_1().
 
 start_sessions_1() ->
     
     S1 = #session_parameter{
-                             id = heartbeat, 
-                             port = 54321,  
-                             senderCompId = "TEST1", targetCompId = "TEST", fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 30, role = acceptor,max_reconnect = 10, reconnect_interval = 2, 
+                             id = ?ID_1, 
+                             port = 11112,  
+                             senderCompId = "TEST1", targetCompId = "TEST",
+                             fix_version = ?FIX_VERSION,
+                             heartbeatInterval = 30, role = acceptor,
+                             max_reconnect = 10, reconnect_interval = 2, 
                              message_checks = #message_checks{check_msgSeqNum = true},
                              callback = {?MODULE, callback1}
                            },
@@ -67,9 +71,11 @@ start_sessions_1() ->
 
 start_sessions_2() ->
     S = #session_parameter{
-                             id = heartbeat1, 
-                             host = localhost, port = 54321, max_reconnect = 10, reconnect_interval = 4, 
-                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
+                             id = ?ID_2, 
+                             host = localhost, port = 11112,
+                             max_reconnect = 10, reconnect_interval = 4, 
+                             senderCompId = "TEST", targetCompId = "TEST1",
+                             fix_version = ?FIX_VERSION,
                              heartbeatInterval = 30, role = initiator,
                              message_checks = #message_checks{check_msgSeqNum = true},
                              callback = {?MODULE, callback}
@@ -78,14 +84,11 @@ start_sessions_2() ->
     ok.
 
 clean() ->
-%%     stop_sessions(),
+    fixerl:stop_session(?ID_2),
+    fixerl:stop_session(?ID_1),
     application:stop(fixerl),
     application:stop(lager),
     application:stop(mnesia).
-
-stop_sessions() -> 
-    fixerl:stop_session(heartbeat1),
-    fixerl:stop_session(heartbeat).
 
 callback(_Id, _M) ->
     ok.

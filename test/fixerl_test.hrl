@@ -1,0 +1,6 @@
+-compile([export_all]).
+-include("fixerl.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-define(DUMMY, dummy).
+-define(LOG(A, B), lager:info(A,B)).
+-define(EMERGENCY(A, B), lager:emergency(A,B)).

@@ -1,40 +1,45 @@
 %% Author: Maxim Minin
 %% Created: 24.06.2012
-%% Description: TODO: Add description to fixerl_heartbeat_test
--module(fixerl_heartbeat_test).
+%% Description: TODO: Add description to fixerl_false_logon_test
+-module(fixerl_false_logon_test).
 
 %%
 %% Include files
 %%
--include("fixerl_test.hrl").
+-include_lib("eunit/include/eunit.hrl").
+-include("fixerl.hrl").
+
+%%
+%% Exported Functions
+%%
+-compile([export_all]).
 
 -define(FIX_VERSION, 'FIX 4.2').
--define(ID_1, fixerl_heartbeat_test_out).
--define(ID_2, fixerl_heartbeat_test_in).
+-define(ID_1, fixerl_false_logon_test_out).
+-define(ID_2, fixerl_false_logon_test_in).
 
 %%
 %% API Functions
 %%
 
-fixerl_4_2_heartbeat_test_() ->
-    {timeout, 6000, ?_assert(test_4_2_run())}.
+fixerl_test_() ->
+    {timeout, 6000, ?_assert(test_run())}.
 
 %%
 %% Local Functions
 %%
-test_4_2_run() ->
+test_run() ->
     setup(),
-    %% sleep for heartbeat test ...
-    timer:sleep(5*1000*4),
-    R = whereis(?ID_1) == undefined
+    timer:sleep(4000),
+    R = whereis(?ID_1) =/= undefined
     andalso whereis(?ID_2) == undefined,
     clean(),
-    R.
+    true.
 
 setup() ->
     mnesia:stop(),
-    mnesia:delete_schema([node()|nodes()]),
-    mnesia:create_schema([node()|nodes()]),
+    mnesia:delete_schema([node()]),
+    mnesia:create_schema([node()]),
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
     lager:set_loglevel(lager_console_backend, emergency),
@@ -45,21 +50,22 @@ setup() ->
 start_sessions() ->
     S1 = #session_parameter{
                              id = ?ID_1, 
-                             port = 11114,  
+                             port = 11115,  
+                             max_reconnect = 10, reconnect_interval = 1, 
                              senderCompId = "TEST1", targetCompId = "TEST",
                              fix_version = ?FIX_VERSION,
-                             max_reconnect = 10, reconnect_interval = 60,
                              heartbeatInterval = 30, role = acceptor,
                              callback = {?MODULE, callback}
                            },
     fixerl:start_session(S1),
     S = #session_parameter{
                              id = ?ID_2, 
-                             host = localhost, port = 11114,
-                             max_reconnect = 10, reconnect_interval = 60, 
-                             senderCompId = "TEST", targetCompId = "TEST1", fix_version = ?FIX_VERSION,
+                             host = localhost, port = 11115,
+                             max_reconnect = 10, reconnect_interval = 20, 
+                             senderCompId = "PING", targetCompId = "PONG",
+                             fix_version = ?FIX_VERSION,
                              heartbeatInterval = 5, role = initiator,
-                             callback = {?MODULE, callback}, start_seqnum = 10
+                             callback = {?MODULE, callback}
                            },
     fixerl:start_session(S),
     ok.

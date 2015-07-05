@@ -1,18 +1,18 @@
 %% @author Maxim Minin 
-%% @doc @todo Add description to fix_4_2_convertor_proper_test.
--module(fix_5_0_record_generator). 
+%% @doc @todo Add description to fix_4_0_record_generator.
+-module(fix_4_0_record_generator). 
 
 %%       
 %% Include files  
 %%
 -include_lib("proper/include/proper.hrl").   
--include_lib("fix_convertor/include/FIX_5_0.hrl").
+-include_lib("fix_convertor/include/FIX_4_0.hrl").
 
 -compile([{no_auto_import, [date/0, time/0]}, 
           {parse_transform, a_generator_transform}, 
           export_all, debug_info]). 
  
--define(FIXVERSION, 'FIX 5.0').   
+-define(FIXVERSION, 'FIX 4.0').   
   
 %% ====================================================================
 %% API functions
@@ -21,17 +21,17 @@
 test_record() ->
     ?LET(M, msgType(), ?MODULE:M()).
 
-resend_record() ->
-    %%TODO 
-    #resendRequest{standardHeader = #standardHeader{beginString = "FIXT.1.1",
+resend_record(M) ->
+    N= erlang:length(M),
+    #resendRequest{standardHeader = #standardHeader{beginString = "FIX.4.2",
                                                       bodyLength = 97,
                                                       msgType = resendRequest,
                                                       senderCompID = "TEST",
                                                       targetCompID = "TEST1",
                                                       msgSeqNum = 2,
                                                       sendingTime = {{2011,8,2},{10,0,0}}},
-                   beginSeqNo = 3, 
-                   endSeqNo = 2,
+                   beginSeqNo = 1, 
+                   endSeqNo = N,
                   standardTrailer = #standardTrailer{}}.
 
 %% ====================================================================
