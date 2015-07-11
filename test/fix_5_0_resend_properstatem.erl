@@ -30,8 +30,9 @@ prop_master() ->
           true = C,
           ?WHENFAIL(begin
             ?EMERGENCY("check_messages:~p~n",[C]),
-            ?EMERGENCY("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n" end,
-               [lists:sort(State#state.messages),lists:sort(Messages), History, State]),
+            ?EMERGENCY("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
+               [lists:sort(State#state.messages),lists:sort(Messages), History, State])
+            end,
          aggregate(command_names(Cmds), Result =:= ok))
       end)).
 
