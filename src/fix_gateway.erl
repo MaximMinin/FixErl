@@ -116,8 +116,9 @@ handle_call(send_heartbeat, _From,
                                         NewCount, FixVersion), 
         Bin = fix_convertor:record2fix(Record, FixVersion), 
         mnesia:transaction(fun() -> 
-            mnesia:write({T, NewCount , Bin}) end),
-        gen_tcp:send(Socket, Bin),
+                            mnesia:write({T, NewCount , Bin}), 
+                            ok = gen_tcp:send(Socket, Bin)
+                           end),
         lager:info([{session, Id}, 
                     {type, out}], " -> ~p", 
                     [fix_convertor:format(Record, FixVersion)])
@@ -132,8 +133,8 @@ handle_call({resend, Msg}, _From, #state{socket = Socket,
     try 
     Bin = fix_convertor:record2fix(Msg, 
                                    FixVersion), 
-        gen_tcp:send(Socket, Bin),
-        lager:info([{session, Id}], " resend -> ~p", 
+        ok = gen_tcp:send(Socket, Bin),
+        lager:info([{session, Id}], " resend -> ~s", 
                    [Bin])
     catch error:Error -> 
             lager:error("~p", [Error])
@@ -142,8 +143,8 @@ handle_call({resend, Msg}, _From, #state{socket = Socket,
 handle_call({resend, Bin}, _From, #state{socket = Socket,
                                          id = Id} = State) ->
     try 
-        gen_tcp:send(Socket, Bin),
-        lager:info([{session, Id}], " resend -> ~p", 
+        ok = gen_tcp:send(Socket, Bin),
+        lager:info([{session, Id}], " resend -> ~s", 
                    [Bin])
     catch error:Error -> 
             lager:error("~p", [Error])
@@ -161,14 +162,15 @@ handle_call({send, Record, NotStandardPart}, _From,
     Bin = fix_convertor:record2fix(NewRecord, 
                                    NotStandardPart,
                                    FixVersion), 
-    gen_tcp:send(Socket, Bin),
     mnesia:transaction(fun() -> 
-        mnesia:write({T, NewCount , Bin}) end),
+                        mnesia:write({T, NewCount , Bin}),
+                        ok = gen_tcp:send(Socket, Bin)
+                       end),
     lager:info([{session, Id}], " -> ~p", 
                [fix_convertor:format(NewRecord, FixVersion)]),
     {reply, ok, State#state{count = NewCount}};
 handle_call({save, Record}, _From,
-            #state{socket = Socket, count = Count, 
+            #state{count = Count, 
                    fix_version = FixVersion,
                    table_out_name = T,
                    id = Id} = State)
