@@ -124,9 +124,6 @@ handle_cast({message, {Msg, NotStandardFields}},
     SenderCompID = Session#session_parameter.senderCompId,
     TargetCompID = Session#session_parameter.targetCompId, 
     Id = Session#session_parameter.id, 
-%%     Callback = Session#session_parameter.callback,
-%%     Role = Session#session_parameter.role,
-%%     Mode = Session#session_parameter.callback_mode,
     ?LOG(Id, " <- ~s", [fix_convertor:format(Msg, FixVersion)]),
     CheckMsgSeqNum = ((State#state.session_params)#session_parameter.message_checks)#message_checks.check_msgSeqNum,
     SyncFlagOld = State#state.sync_flag,
@@ -144,7 +141,7 @@ handle_cast({message, {Msg, NotStandardFields}},
                 PrMsgNum = process_msg(Msg, NotStandardFields, Pid, FixSender, Tin, Tout,
                                        State#state.count + 1, State#state.session_params,
                                        State#state.login),
-                case State#state.diff > State#state.diff_count of
+                case State#state.diff >= State#state.diff_count + PrMsgNum of
                     false ->
                         ?LOG(Id, "session is sync again", []),
                         {false, State#state.count + PrMsgNum, 
@@ -279,32 +276,35 @@ process_msg(Msg, NotStandardFields, _Pid, FixSender, Tin, Tout, C, Parameter, _L
             timer:sleep(?LOGOUT_TIMEOUT),
             erlang:exit(fix_session_close);
         resendRequest ->
-            lists:map(fun(Num) -> 
-                case  mnesia:dirty_read({Tout, Num}) of
-                    [{Tout, Num, ResendMessage}] ->
-                        case fix_utils:is_msg_to_skip(FixVersion, ResendMessage, Skips) of
-                            false ->
-                                fix_gateway:resend(FixSender, ResendMessage);
-                            true ->
-                                GapMsg = fix_utils:get_sequence_reset(FixVersion,
-                                                                      SenderCompID,
-                                                                      TargetCompID,
-                                                                      Num),
-                                fix_gateway:resend(FixSender, GapMsg)
-                        end;
-                    [] -> ok
-                end end, 
-                 fix_utils:get_numbers(FixVersion, Msg)),
+            case fix_utils:get_from_to(FixVersion, Msg) of
+                undefined -> 
+                    ?LOG(Id, "no resend - messages not found", []),
+                    ok;
+                {From, To} ->
+                    ?LOG(Id, "resend from ~p to ~p", [From, To]),
+                    MS = [{{'$1','$2','$3'},
+                            [{'andalso',{'>=','$2',From},{'=<','$2', To}}],
+                            [{{'$1','$2','$3'}}]}],
+                    
+                    resend_msgs(lists:sort(mnesia:dirty_select(Tout, MS)),
+                                undefined, Skips, Id, FixSender, 
+                                FixVersion, SenderCompID, TargetCompID) 
+            end,
             1;
         sequenceReset ->
             {NextNumber, _GapFillMessage} = fix_utils:get_reset_atr(FixVersion, Msg),
-            S = lists:seq(C+1, erlang:max(NextNumber-1,C+1)) -- [C+1],
-            lists:map(fun(Num) -> 
-                              mnesia:transaction(fun() ->
-                                                         mnesia:write({Tin, Num , Msg})
-                                                 end)
-                      end, S),
-            erlang:length(S)+1 ;
+            case NextNumber == (C+1) of
+                false ->
+                    S = lists:seq(C+1, erlang:max(NextNumber-1,C+1)),
+                    lists:map(fun(Num) -> 
+                                      mnesia:transaction(fun() ->
+                                                                 mnesia:write({Tin, Num , Msg})
+                                                         end)
+                              end, S),
+                    erlang:length(S)+1;
+                true ->
+                    1
+            end;
         _Else ->
             case Mode of
                 all -> 
@@ -343,4 +343,46 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
-
+resend_msgs([], Acc, _Skips, Id, _FixSender, 
+            _FixVersion, _SenderCompID, _TargetCompID) ->
+    ?LOG(Id, "resend_msgs end: ~p", [Acc]),
+    ok;
+resend_msgs([{_Tout, Num, ResendMessage}|Msgs],
+            Acc, Skips, Id, FixSender, 
+            FixVersion, SenderCompID, TargetCompID) ->
+    IsToSkip = fix_utils:is_msg_to_skip(FixVersion, 
+                                        ResendMessage, Skips),
+    ?LOG_DEV(Id, "resend_msgs: ~p ~p ~p ~p", [Acc, Num, IsToSkip, ResendMessage]),
+    case {IsToSkip, Acc, Msgs} of
+        {false, undefined, _} ->
+            fix_gateway:resend(FixSender, ResendMessage),
+            resend_msgs(Msgs, undefined, Skips, Id, FixSender, 
+                        FixVersion, SenderCompID, TargetCompID);
+        {false, Int, _} ->
+            GapMsg = fix_utils:get_sequence_reset(FixVersion,
+                                                  SenderCompID,
+                                                  TargetCompID,
+                                                  Int, Num),
+            fix_gateway:resend(FixSender, GapMsg),
+            fix_gateway:resend(FixSender, ResendMessage),
+            resend_msgs(Msgs, undefined, Skips, Id, FixSender,
+                        FixVersion, SenderCompID, TargetCompID);
+        {true, undefined, []} ->
+            GapMsg = fix_utils:get_sequence_reset(FixVersion,
+                                                  SenderCompID,
+                                                  TargetCompID,
+                                                  Num, Num+1),
+            fix_gateway:resend(FixSender, GapMsg);
+        {true, Int, []} ->
+            GapMsg = fix_utils:get_sequence_reset(FixVersion,
+                                                  SenderCompID,
+                                                  TargetCompID,
+                                                  Int, Num+1),
+            fix_gateway:resend(FixSender, GapMsg);
+        {true, undefined, _} ->
+            resend_msgs(Msgs, Num, Skips, Id, FixSender,
+                        FixVersion, SenderCompID, TargetCompID);
+        {true, Int, _} ->
+            resend_msgs(Msgs, Int, Skips, Id, FixSender,
+                        FixVersion, SenderCompID, TargetCompID)
+    end.
