@@ -86,8 +86,6 @@ setup() ->
     Ret.
 
 clean() ->
-    fixerl:stop_session(?MODULE),
-    fixerl:stop_session(?ID_),
     application:stop(fixerl),
     application:stop(mnesia).
 

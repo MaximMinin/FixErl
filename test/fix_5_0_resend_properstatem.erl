@@ -26,14 +26,11 @@ prop_master() ->
           Messages  = receive_messages(),
           erlang:unregister(?DUMMY),
           fix_5_0_resend_properstatem:clean(),
-          ?LOG("State:~p~n" ,[State#state.messages]),
-          ?LOG("Receive:~p~n",[Messages]),
-          ?LOG("Result:~p~n",[Result]),
           C = check_messages(State#state.messages, Messages),
-          ?LOG("check_messages:~p~n",[C]),
           true = C,
-          ?WHENFAIL(
-            ?EMERGENCY("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n",
+          ?WHENFAIL(begin
+            ?EMERGENCY("check_messages:~p~n",[C]),
+            ?EMERGENCY("State:~p~nReceive:~p~nHistory: ~w\n State: ~w\n" end,
                [lists:sort(State#state.messages),lists:sort(Messages), History, State]),
          aggregate(command_names(Cmds), Result =:= ok))
       end)).
@@ -56,7 +53,6 @@ next_state(S, _V, {call,_,send,[?MODULE, Record]}) ->
             [A|_] = L,
             E = lists:last(L),
             Resended = lists:sublist(S#state.messages, A, E-A+1),
-            ?LOG("RESEND: ~p", [Resended]),
             S#state{messages = lists:append(S#state.messages, Resended)}
     end;
 next_state(S, _V, {call,_,send,[?ID_, Record]}) ->
@@ -117,8 +113,6 @@ setup() ->
     Ret.
 
 clean() ->
-    fixerl:stop_session(?MODULE),
-    fixerl:stop_session(?ID_),
     application:stop(fixerl),
     application:stop(mnesia).
 
@@ -148,5 +142,4 @@ receive_messages(L) ->
   end.
 
 check_messages(L, L1) ->
-   ?LOG("OUT: ~p IN: ~p~n", [length(L),length(L1)]),
     erlang:length(L) == erlang:length(L1).

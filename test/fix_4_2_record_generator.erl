@@ -22,7 +22,7 @@ test_record() ->
     ?LET(M, msgType(), ?MODULE:M()).
 
 resend_record(M) ->
-    N= erlang:length(M),
+    _N= erlang:length(M),
     #resendRequest{standardHeader = #standardHeader{beginString = "FIX.4.2",
                                                       bodyLength = 97,
                                                       msgType = resendRequest,
@@ -30,8 +30,8 @@ resend_record(M) ->
                                                       targetCompID = "TEST1",
                                                       msgSeqNum = 2,
                                                       sendingTime = {{2011,8,2},{10,0,0}}},
-                   beginSeqNo = 1, 
-                   endSeqNo = N,
+                   beginSeqNo = 3, 
+                   endSeqNo = 2,
                   standardTrailer = #standardTrailer{}}.
 
 %% ====================================================================

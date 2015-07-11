@@ -26,8 +26,6 @@ prop_master() ->
           Messages  = receive_messages(),
           erlang:unregister(?DUMMY),
           fix_4_2_resend_properstatem:clean(),
-         ?LOG("State:~p~n" ,[State#state.messages]),
-         ?LOG("Receive:~p~n",[Messages]),
           ?LOG("HEADERS OUT: ~p", [[erlang:element(1, M) ||M <- State#state.messages]]),
           ?LOG("HEADERS  IN: ~p", [[erlang:element(1, M) ||M <- Messages]]),
           ?LOG("Result:~p~n",[Result]),
@@ -99,7 +97,7 @@ setup() ->
                              port = 11118,  
                              senderCompId = "TEST1", targetCompId = "TEST",
                              fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 5, role = acceptor, 
+                             heartbeatInterval = 30, role = acceptor, 
                              message_checks = #message_checks{check_msgSeqNum = false},
                              callback = {?MODULE, callback1}
                            },
@@ -110,7 +108,7 @@ setup() ->
                              max_reconnect = 10, reconnect_interval = 20, 
                              senderCompId = "TEST", targetCompId = "TEST1",
                              fix_version = ?FIX_VERSION,
-                             heartbeatInterval = 5, role = initiator, 
+                             heartbeatInterval = 30, role = initiator, 
                              message_checks = #message_checks{check_msgSeqNum = false},
                              callback = {?MODULE, callback}, 
                              logon_callback = {?MODULE, logon_succeeded}
@@ -120,18 +118,8 @@ setup() ->
     Ret.
 
 clean() ->
-    fixerl:stop_session(?MODULE),
-    fixerl:stop_session(?ID_),
     application:stop(fixerl),
     application:stop(mnesia).
-
-reset_sessions() ->
-    S = fix_worker:get_session_parameter(?MODULE),
-    S1 = fix_worker:get_session_parameter(?ID_),
-    fixerl:reset_session(?MODULE),
-    fixerl:reset_session(?ID_),
-    fixerl:start_session(S1),
-    fixerl:start_session(S).
 
 callback(_Id, M) ->
     ?DUMMY ! M,

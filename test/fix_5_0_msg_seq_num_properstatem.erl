@@ -30,10 +30,9 @@ prop_master() ->
 		  MsgNumIn = fix_worker:get_message_count(?MODULE),
           erlang:unregister(?DUMMY),
           fix_5_0_msg_seq_num_properstatem:clean(),
-          ?LOG("Result:~p~n",[Result]),
-          ?LOG("Out:~p In:~p ~n",[MsgNumOut, MsgNumIn]),
-          ?WHENFAIL(
-            ?EMERGENCY("History: ~w\n State: ~w\n", [History, State]),
+          ?WHENFAIL(begin
+            ?EMERGENCY("In: ~p Out: ~p Result: ~p", [MsgNumIn, MsgNumOut, Result]),
+            ?EMERGENCY("History: ~w\n State: ~w\n", [History, State]) end,
          aggregate(command_names(Cmds), Result =:= ok andalso MsgNumOut == MsgNumIn))
       end)).
 
@@ -102,8 +101,6 @@ setup() ->
     Ret.
 
 clean() ->
-    fixerl:stop_session(?MODULE),
-    fixerl:stop_session(?ID_),
     application:stop(fixerl),
     application:stop(mnesia).
 

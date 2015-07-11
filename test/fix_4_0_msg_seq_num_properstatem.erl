@@ -28,12 +28,10 @@ prop_master() ->
           timer:sleep(500),
 		  MsgNumIn = fix_worker:get_message_count(?MODULE),
           fix_4_0_msg_seq_num_properstatem:clean(),
-          ?LOG("Result:~p~n",[Result]),
-          ?LOG("~p Out:~p In:~p ~n",[?MODULE, MsgNumOut, MsgNumIn]),
-          MsgNumOut = MsgNumIn,
-          ?WHENFAIL(
-            ?EMERGENCY("History: ~w\n State: ~w\n", [History, State]),
-         aggregate(command_names(Cmds), Result =:= ok))
+          ?WHENFAIL(begin 
+            ?EMERGENCY("In: ~p Out: ~p Result: ~p", [MsgNumIn, MsgNumOut, Result]),
+            ?EMERGENCY("History: ~w\n State: ~w\n", [History, State]) end,
+         aggregate(command_names(Cmds), Result =:= ok andalso MsgNumOut == MsgNumIn))
       end)).
 
 initial_state() ->
@@ -91,8 +89,6 @@ setup() ->
     Ret.
 
 clean() ->
-    fixerl:stop_session(?MODULE),
-    fixerl:stop_session(?ID_),
     application:set_env(fixerl, sessions, []),
     application:stop(fixerl),
     application:stop(mnesia).
