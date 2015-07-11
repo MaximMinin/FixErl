@@ -59,7 +59,7 @@ start_sessions_1() ->
     S1 = #session_parameter{
                              id = ?ID_1, 
                              port = 11112,  
-                             senderCompId = "TEST1", targetCompId = "TEST",
+                             senderCompId = "RESTART1", targetCompId = "RESTART",
                              fix_version = ?FIX_VERSION,
                              heartbeatInterval = 30, role = acceptor,
                              max_reconnect = 10, reconnect_interval = 2, 
@@ -74,7 +74,7 @@ start_sessions_2() ->
                              id = ?ID_2, 
                              host = localhost, port = 11112,
                              max_reconnect = 10, reconnect_interval = 4, 
-                             senderCompId = "TEST", targetCompId = "TEST1",
+                             senderCompId = "RESTART", targetCompId = "RESTART1",
                              fix_version = ?FIX_VERSION,
                              heartbeatInterval = 30, role = initiator,
                              message_checks = #message_checks{check_msgSeqNum = true},
