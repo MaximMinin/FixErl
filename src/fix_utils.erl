@@ -16,14 +16,14 @@
 %%
 %% Exported Functions
 %%
--export([is_msg_to_skip/3, get_sequence_reset/4,
+-export([is_msg_to_skip/3, get_sequence_reset/5,
          get_reset_atr/2,
          get_logon/3, get_logout/3,
          check_logon/4, 
          get_heartbeat/3, get_heartbeat/2,
          get_numbers/2, get_seq_number/2,
          getNow/0, getNow/1, getUniq/0,
-         get_resend_request/5]).
+         get_resend_request/5, get_from_to/2]).
 
 %% ====================================================================
 %% API Functions
@@ -76,7 +76,7 @@ check_logon(FixVersion, Logon,
 %%                          NewSeqNo::int()) -> #sequenceReset{}
 %% @end
 %% --------------------------------------------------------------------
-get_sequence_reset(FixVersion, SenderCompID, TargetCompID, NewSeqNo) ->
+get_sequence_reset(FixVersion, SenderCompID, TargetCompID, SeqNo, NewSeqNo) ->
     Utils = fix_convertor:get_util_module(FixVersion),
     L = Utils:getRecord(sequenceReset),
     H = Utils:getRecord(standardHeader),
@@ -92,8 +92,8 @@ get_sequence_reset(FixVersion, SenderCompID, TargetCompID, NewSeqNo) ->
     Utils:setFieldInRecord(standardHeader, msgType, 
     Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
                            sequenceReset), ?MODULE:getNow()), TargetCompID)),
-                           NewSeqNo+1), gapFillMessage),
-    fix_convertor:set_msg_seqnum(R, NewSeqNo, FixVersion).
+                           NewSeqNo), gapFillMessage),
+    fix_convertor:set_msg_seqnum(R, SeqNo, FixVersion).
 
 %% --------------------------------------------------------------------
 %% @doc Gets the logout message
@@ -275,6 +275,17 @@ get_numbers(FixVersion, ResendRequest) ->
         false -> []
     end.
 
+get_from_to(FixVersion, ResendRequest) ->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:get_record_def(resendRequest),
+    P1 = find_first(beginSeqNo, L),
+    P2 = find_first(endSeqNo, L),
+    case (P1 > 0) andalso (P2 > 0) andalso (P1 =< P2) of
+        true ->
+            {erlang:element(P1, ResendRequest),
+             erlang:element(P2, ResendRequest)};
+        false -> undefined
+    end.
 %% --------------------------------------------------------------------
 %% @doc Gets the list of message numbers to be resend
 %%
