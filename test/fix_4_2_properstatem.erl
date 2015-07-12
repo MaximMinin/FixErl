@@ -25,8 +25,10 @@ prop_master() ->
           check_messages(State#state.messages, Messages),
           check_messages(State#state.messages1, Messages1),
           ?WHENFAIL(
-            ?EMERGENCY("History: ~w\n State: ~w\n",
-               [History, State]),
+            begin
+                ?EMERGENCY("History: ~w\n State: ~w\n", [History, State]),
+                ?EMERGENCY("History: ~w\n State: ~w\n", [History, State])
+            end,
          aggregate(command_names(Cmds), Result =:= ok))
       end)).
 
@@ -123,8 +125,6 @@ setup() ->
     Ret.
 
 clean() ->
-    fixerl:stop_session(test),
-    fixerl:stop_session(test1),
     application:stop(fixerl),
     application:stop(lager),
     application:stop(mnesia).
