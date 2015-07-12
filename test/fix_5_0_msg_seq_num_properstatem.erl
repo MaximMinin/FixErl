@@ -30,10 +30,14 @@ prop_master() ->
 		  MsgNumIn = fix_worker:get_message_count(?MODULE),
           erlang:unregister(?DUMMY),
           fix_5_0_msg_seq_num_properstatem:clean(),
-          ?WHENFAIL(begin
-            ?EMERGENCY("In: ~p Out: ~p Result: ~p", [MsgNumIn, MsgNumOut, Result]),
-            ?EMERGENCY("History: ~w\n State: ~w\n", [History, State]) end,
-         aggregate(command_names(Cmds), Result =:= ok andalso MsgNumOut == MsgNumIn))
+          ?WHENFAIL(
+              begin
+                ?EMERGENCY("Test failed", []),
+                ?EMERGENCY("In: ~p Out: ~p Result: ~p", [MsgNumIn, MsgNumOut, Result]),
+                ?EMERGENCY("History: ~w", [History]),
+                ?EMERGENCY("State: ~w", [State])
+              end,
+             aggregate(command_names(Cmds), Result =:= ok andalso MsgNumOut == MsgNumIn))
       end)).
 
 initial_state() ->

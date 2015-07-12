@@ -96,11 +96,17 @@ is_eq(Rec1, Rec2) ->
     andalso
     H1#standardHeader{origSendingTime= not_to_check,
                       beginString = not_to_check,
+                      senderCompID = not_to_check,
+                      targetCompID = not_to_check,
                       msgSeqNum = not_to_check,
+                      sendingTime = not_to_check,
                       bodyLength = not_to_check} == 
         H2#standardHeader{origSendingTime= not_to_check,
                           beginString = not_to_check,
+                          senderCompID = not_to_check,
+                          targetCompID = not_to_check,
                           msgSeqNum = not_to_check,
+                          sendingTime = not_to_check,
                           bodyLength = not_to_check}
     andalso
     T1#standardTrailer{signature=not_to_check,

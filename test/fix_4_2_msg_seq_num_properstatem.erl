@@ -29,7 +29,12 @@ prop_master() ->
            erlang:unregister(?DUMMY),
           fix_4_2_msg_seq_num_properstatem:clean(),
           ?WHENFAIL(
-            ?EMERGENCY("ERROR: ~p/~p History: ~w\n State: ~w\n", [MsgNumOut, MsgNumIn, History, State]),
+              begin
+                ?EMERGENCY("Test failed", []),
+                ?EMERGENCY("In: ~p Out: ~p Result: ~p", [MsgNumIn, MsgNumOut, Result]),
+                ?EMERGENCY("History: ~w", [History]),
+                ?EMERGENCY("State: ~w", [State])
+              end,
          aggregate(command_names(Cmds), Result =:= ok andalso MsgNumOut == MsgNumIn))
       end)).
 
