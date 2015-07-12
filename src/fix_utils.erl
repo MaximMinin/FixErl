@@ -23,7 +23,8 @@
          get_heartbeat/3, get_heartbeat/2,
          get_numbers/2, get_seq_number/2,
          getNow/0, getNow/1, getUniq/0,
-         get_resend_request/5, get_from_to/2]).
+         get_resend_request/5, get_from_to/2,
+         complete_message/4]).
 
 %% ====================================================================
 %% API Functions
@@ -302,6 +303,31 @@ get_reset_atr(FixVersion, SequenceReset) ->
     P2 = find_first(gapFillFlag, L),
     {erlang:element(P1, SequenceReset),
      erlang:element(P2, SequenceReset)}.
+
+%% --------------------------------------------------------------------
+%% @doc complete message
+%%
+%% @spec complete_message(FixVersion::atom(),
+%%                        SenderCompID::binary(), 
+%%                        TargetCompID::binary(),
+%%                        Message::tuple()) -> tuple().
+%% @end
+%% --------------------------------------------------------------------
+complete_message(FixVersion, Message,
+                 SenderCompID, TargetCompID) ->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    Type = erlang:element(1, Message),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(Type, standardHeader,
+                           Utils:setFieldInRecord(Type, 
+                                                  standardTrailer,
+                                                  Message, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           Type), ?MODULE:getNow()), TargetCompID)).
     
 %% --------------------------------------------------------------------
 %% @doc Gets timestamp (now + AddTimeInSec) in fix format 

@@ -154,11 +154,19 @@ handle_call({send, Record, NotStandardPart}, _From,
             #state{socket = Socket, count = Count, 
                    fix_version = FixVersion,
                    table_out_name = T,
-                   id = Id} = State)
+                   id = Id, senderCompID = SenderCompID,
+                   targetCompID = TargetCompID} = State)
             when erlang:is_tuple(Record) ->
     NewCount = Count+1,
-    NewRecord = fix_convertor:set_msg_seqnum(Record, 
-                                       NewCount, FixVersion), 
+    NewRecord = 
+    case erlang:element(2, Record) of
+        undefined ->
+            CR = fix_utils:complete_message(FixVersion, Record,
+                                       SenderCompID, TargetCompID),
+            fix_convertor:set_msg_seqnum(CR, NewCount, FixVersion);
+        _Else ->
+            fix_convertor:set_msg_seqnum(Record, NewCount, FixVersion)
+    end,
     Bin = fix_convertor:record2fix(NewRecord, 
                                    NotStandardPart,
                                    FixVersion), 
@@ -173,11 +181,19 @@ handle_call({save, Record}, _From,
             #state{count = Count, 
                    fix_version = FixVersion,
                    table_out_name = T,
-                   id = Id} = State)
+                   id = Id, senderCompID = SenderCompID,
+                   targetCompID = TargetCompID} = State)
             when erlang:is_tuple(Record) ->
     NewCount = Count+1,
-    NewRecord = fix_convertor:set_msg_seqnum(Record, 
-                                       NewCount, FixVersion), 
+    NewRecord = 
+    case erlang:element(2, Record) of
+        undefined ->
+            CR = fix_utils:complete_message(FixVersion, Record,
+                                       SenderCompID, TargetCompID),
+            fix_convertor:set_msg_seqnum(CR, NewCount, FixVersion);
+        _Else ->
+            fix_convertor:set_msg_seqnum(Record, NewCount, FixVersion)
+    end,
     Bin = fix_convertor:record2fix(NewRecord, FixVersion), 
     mnesia:transaction(fun() -> 
         mnesia:write({T, NewCount , Bin}) end),
