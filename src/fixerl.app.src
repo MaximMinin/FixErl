@@ -1,11 +1,14 @@
 {application, fixerl,
  [
   {description, ""},
-  {vsn, "2.0.1"},
+  {vsn, "2.0.2"},
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  mnesia,
+                  lager,
+                  fix_convertor
                  ]},
   {mod, { fixerl_app, []}},
   {env, [{sessions, []}]}
