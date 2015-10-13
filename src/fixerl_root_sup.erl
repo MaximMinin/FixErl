@@ -52,9 +52,8 @@ start_link() ->
 %%      {ok, pid()} | {error, Reason}
 %%
 %% @end
-start_session(#session_parameter{id=Id}=S) ->
+start_session(#session_parameter{}=S) ->
     lager:info("Start session: ~p",[S]),
-    fixerl_mnesia_utils:create_table(Id),
     supervisor:start_child(?MODULE, [S]).
 
 %% --------------------------------------------------------------------

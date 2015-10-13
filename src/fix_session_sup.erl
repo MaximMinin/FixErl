@@ -27,6 +27,7 @@
 %% ===================================================================
 
 start_link(#session_parameter{id = Id} = S) ->
+    fixerl_mnesia_utils:create_table(Id),
     supervisor:start_link({local, erlang:list_to_atom(
                                     lists:concat([Id, "_",?MODULE]))}, 
                             ?MODULE, [S]).
