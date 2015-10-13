@@ -37,6 +37,7 @@ setup() ->
     mnesia:create_schema([node()|nodes()]),
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
+    application:start(fix_convertor),
     lager:set_loglevel(lager_console_backend, emergency),
     fixerl_mnesia_utils:init(),
     ok = fixerl:start(),

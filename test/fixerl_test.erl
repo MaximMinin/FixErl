@@ -47,6 +47,7 @@ test_4_2_run() ->
 resend_test_4_2_run() ->
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
+    application:start(fix_convertor),
     lager:set_loglevel(lager_console_backend, emergency),
     R = proper:quickcheck(proper:numtests(10, fix_4_2_resend_properstatem:prop_master())),
     application:stop(lager),
@@ -55,6 +56,7 @@ resend_test_4_2_run() ->
 resend_test_5_0_run() ->
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
+    application:start(fix_convertor),
     lager:set_loglevel(lager_console_backend, emergency),
     R = proper:quickcheck(proper:numtests(10, fix_5_0_resend_properstatem:prop_master())),
     application:stop(lager),
@@ -64,6 +66,7 @@ resend_test_5_0_run() ->
 msq_seq_num_test_5_0_run() ->
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
+    application:start(fix_convertor),
     lager:set_loglevel(lager_console_backend, emergency),
     R = proper:quickcheck(proper:numtests(10, fix_5_0_msg_seq_num_properstatem:prop_master())),
     application:stop(lager),
@@ -72,6 +75,7 @@ msq_seq_num_test_5_0_run() ->
 msq_seq_num_test_4_2_run() ->
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
+    application:start(fix_convertor),
     lager:set_loglevel(lager_console_backend, emergency),
     R = proper:quickcheck(proper:numtests(10, fix_4_2_msg_seq_num_properstatem:prop_master())),
     application:stop(lager),
@@ -80,6 +84,7 @@ msq_seq_num_test_4_2_run() ->
 msq_seq_num_test_4_0_run() ->
     application:set_env(lager, error_logger_hwm, 500),
     lager:start(),
+    application:start(fix_convertor),
     lager:set_loglevel(lager_console_backend, emergency),
     R = proper:quickcheck(proper:numtests(10, fix_4_0_msg_seq_num_properstatem:prop_master())),
     application:stop(lager),
