@@ -15,6 +15,7 @@
                              fix_version :: fix_version(),
                              start_seqnum :: pos_integer(),
                              heartbeatInterval :: pos_integer(),
+                             max_history_age = 1 :: pos_integer(),
                              senderCompId :: string(),
                              targetCompId :: string(),
                              skip_by_resend_request = [logon, testRequest, heartbeat, logout, sequenceReset, resendRequest],
