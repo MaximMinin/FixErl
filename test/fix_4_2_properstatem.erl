@@ -96,6 +96,7 @@ postcondition(_S, {call,_,send,[_Name, _Record]}, _Result) ->
     true.
 
 setup() ->
+	application:stop(mnesia),
     mnesia:delete_schema([node()|nodes()]),
     mnesia:create_schema([node()|nodes()]),
     application:set_env(lager, error_logger_hwm, 500),
