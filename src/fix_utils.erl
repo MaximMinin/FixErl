@@ -21,6 +21,7 @@
          get_logon/3, get_logout/3,
          check_logon/4, 
          get_heartbeat/3, get_heartbeat/2,
+         get_testreques/3,
          get_numbers/2, get_seq_number/2,
          getNow/0, getNow/1, getUniq/0,
          get_resend_request/5, get_from_to/2,
@@ -179,6 +180,30 @@ get_heartbeat(FixVersion, SenderCompID, TargetCompID)->
     Utils:setFieldInRecord(standardHeader, msgType, 
     Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
                            heartbeat), ?MODULE:getNow()),
+                           TargetCompID)),
+                           ?MODULE:getUniq()).
+
+%% --------------------------------------------------------------------
+%% @doc Gets the heartbeat message
+%%
+%% @spec get_heartbeat(SenderCompID::binary(), 
+%%                     TargetCompID::binary()) -> #hearbeat{}
+%% @end
+%% --------------------------------------------------------------------
+get_testreques(FixVersion, SenderCompID, TargetCompID)->
+    Utils = fix_convertor:get_util_module(FixVersion),
+    L = Utils:getRecord(testRequest),
+    H = Utils:getRecord(standardHeader),
+    T = Utils:getRecord(standardTrailer),
+    Utils:setFieldInRecord(testRequest,testReqID,
+    Utils:setFieldInRecord(testRequest, standardHeader,
+                           Utils:setFieldInRecord(testRequest, 
+                                                  standardTrailer, L, T),
+    Utils:setFieldInRecord(standardHeader, targetCompID, 
+    Utils:setFieldInRecord(standardHeader, sendingTime, 
+    Utils:setFieldInRecord(standardHeader, msgType, 
+    Utils:setFieldInRecord(standardHeader, senderCompID, H, SenderCompID),
+                           testRequest), ?MODULE:getNow()),
                            TargetCompID)),
                            ?MODULE:getUniq()).
 

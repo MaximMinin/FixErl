@@ -17,7 +17,7 @@
 %% --------------------------------------------------------------------
 %% External exports
 -export([start_link/6, send/2, send/3, save/2,
-         resend/2, send_heartbeat/1]).
+         resend/2, send_heartbeat/1, send_testrequest/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, 
@@ -38,6 +38,8 @@ send(Pid, Message, NotStandardPart)->
     gen_server:call(Pid, {send, Message, NotStandardPart}).
 send_heartbeat(Pid)->
     gen_server:call(Pid, send_heartbeat).
+send_testrequest(Pid)->
+    gen_server:call(Pid, send_testrequest).
 resend(Pid, Message)->
     gen_server:call(Pid, {resend, Message}).
 
@@ -115,7 +117,29 @@ handle_call(send_heartbeat, _From,
                                         SenderCompID, TargetCompID), 
                                         NewCount, FixVersion), 
         Bin = fix_convertor:record2fix(Record, FixVersion), 
-        mnesia:transaction(fun() -> 
+        {atomic, _} = mnesia:transaction(fun() -> 
+                            mnesia:write({T, NewCount , Bin}), 
+                            ok = gen_tcp:send(Socket, Bin)
+                           end),
+        lager:info([{session, Id}, 
+                    {type, out}], " -> ~p", 
+                    [fix_convertor:format(Record, FixVersion)])
+    catch error:Error -> 
+            lager:error("~p", [Error])
+    end,
+    {reply, ok, State#state{count = NewCount}};
+handle_call(send_testrequest, _From,
+            #state{socket = Socket, count = Count, 
+            senderCompID = SenderCompID, targetCompID = TargetCompID,
+            fix_version = FixVersion, table_out_name = T, id = Id} 
+           = State) ->
+    NewCount = Count+1,
+    try 
+        Record = fix_convertor:set_msg_seqnum(fix_utils:get_testreques(FixVersion,
+                                        SenderCompID, TargetCompID), 
+                                        NewCount, FixVersion), 
+        Bin = fix_convertor:record2fix(Record, FixVersion), 
+        {atomic, _} = mnesia:transaction(fun() -> 
                             mnesia:write({T, NewCount , Bin}), 
                             ok = gen_tcp:send(Socket, Bin)
                            end),
@@ -170,7 +194,7 @@ handle_call({send, Record, NotStandardPart}, _From,
     Bin = fix_convertor:record2fix(NewRecord, 
                                    NotStandardPart,
                                    FixVersion), 
-    mnesia:transaction(fun() -> 
+    {atomic, _} = mnesia:transaction(fun() -> 
                         mnesia:write({T, NewCount , Bin}),
                         ok = gen_tcp:send(Socket, Bin)
                        end),
@@ -195,7 +219,7 @@ handle_call({save, Record}, _From,
             fix_convertor:set_msg_seqnum(Record, NewCount, FixVersion)
     end,
     Bin = fix_convertor:record2fix(NewRecord, FixVersion), 
-    mnesia:transaction(fun() -> 
+    {atomic, _} = mnesia:transaction(fun() -> 
         mnesia:write({T, NewCount , Bin}) end),
     lager:info([{session, Id}], " save -> ~p", 
                [fix_convertor:format(NewRecord, FixVersion)]),
