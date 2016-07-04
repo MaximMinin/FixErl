@@ -105,6 +105,7 @@ init([Pid, FixSender, Session]) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
 handle_call(get_message_count, _From, State) ->
+	lager:info("get message count ~p", [State#state.count]),
     {reply, State#state.count, State};
 handle_call(get_session_parameter, _From, State) ->
     {reply, State#state.session_params, State}.
@@ -143,7 +144,7 @@ handle_cast({message, {Msg, NotStandardFields}},
                                        State#state.login),
                 case State#state.diff >= State#state.diff_count + PrMsgNum of
                     false ->
-                        ?LOG(Id, "session is sync again", []),
+                        ?LOG(Id, "session is sync again ~p ~p", [State#state.count, PrMsgNum]),
                         {false, State#state.count + PrMsgNum, 
                          undefined, undefined};
                     true ->
@@ -232,7 +233,9 @@ process_msg(Msg, _NotStandardFields, Pid, FixSender, Tin, _Tout, C, Parameter, u
                     end,
                     Pid ! fix_starting,
                     case LogonCallback of
-                        {M, F} -> M:F();
+                        {M, F} ->
+                            lager:info("call logon callback ~p", [LogonCallback]),
+                            M:F();
                         _ -> ok
                     end,
                     ok;
@@ -293,16 +296,19 @@ process_msg(Msg, NotStandardFields, _Pid, FixSender, Tin, Tout, C, Parameter, _L
             1;
         sequenceReset ->
             {NextNumber, _GapFillMessage} = fix_utils:get_reset_atr(FixVersion, Msg),
-            case NextNumber == (C+1) of
-                false ->
                     S = lists:seq(C+1, erlang:max(NextNumber-1,C+1)),
                     lists:map(fun(Num) -> 
+									  lager:info("mnesia write reset: ~p", [Num]),
                                       mnesia:transaction(fun() ->
                                                                  mnesia:write({Tin, Num , Msg})
                                                          end)
                               end, S),
+            case NextNumber == (C+1) of
+                false ->
+					lager:info("reset ~p ~p", [erlang:length(S)+1, S]),
                     erlang:length(S)+1;
                 true ->
+					lager:info("reset set 1"),
                     1
             end;
         _Else ->

@@ -52,6 +52,20 @@ start_link() ->
 %%      {ok, pid()} | {error, Reason}
 %%
 %% @end
+start_session({session_parameter, Id, Host, Port, MaxRec, RecInt, Role,
+               Callback, CallbackMode, LogonCallback,
+               FixVersion, StartSeqNum, HearbeatInterval,
+               SenderCompId, TargetCompId, SkipByResend, Checks}) ->
+    S = #session_parameter{ id = Id, host = Host, port = Port,
+                            max_reconnect = MaxRec, reconnect_interval = RecInt,
+                            role = Role, callback = Callback,
+                            callback_mode = CallbackMode, logon_callback = LogonCallback,
+                            fix_version = FixVersion, start_seqnum = StartSeqNum,
+                            heartbeatInterval = HearbeatInterval, senderCompId = SenderCompId,
+                            targetCompId = TargetCompId, skip_by_resend_request = SkipByResend,
+                            message_checks = Checks},
+    lager:info("Start session: ~p",[S]),
+    supervisor:start_child(?MODULE, [S]);
 start_session(#session_parameter{}=S) ->
     lager:info("Start session: ~p",[S]),
     supervisor:start_child(?MODULE, [S]).

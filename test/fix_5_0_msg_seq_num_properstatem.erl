@@ -75,10 +75,10 @@ postcondition(_S, {call,_,_command,_}, _Result) ->
     true.
 
 setup() ->
+	application:stop(mnesia),
     ok = mnesia:delete_schema([node()]),
     ok = mnesia:create_schema([node()]),
     fixerl_mnesia_utils:init(),
-    Ret = fixerl:start(),
     S1 = #session_parameter{
                              id = ?ID_, 
                              port = 11117, max_reconnect = 10,
@@ -89,7 +89,9 @@ setup() ->
                              message_checks = #message_checks{check_msgSeqNum = false},
                              callback = {?MODULE, callback1}
                            },
-    fixerl:start_session(S1),
+	application:load(fixerl),
+    application:set_env(fixerl, sessions, [S1]),
+    Ret = fixerl:start(),
     S = #session_parameter{
                              id = ?MODULE, 
                              host = localhost, port = 11117,

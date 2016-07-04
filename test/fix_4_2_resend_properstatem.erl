@@ -88,6 +88,7 @@ postcondition(_S, {call,_,send,[_Name, _Record]}, _Result) ->
     true.
 
 setup() ->
+	application:stop(mnesia),
     ok = mnesia:delete_schema([node()]),
     ok = mnesia:create_schema([node()]),
     fixerl_mnesia_utils:init(),

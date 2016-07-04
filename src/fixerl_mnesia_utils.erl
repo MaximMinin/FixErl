@@ -20,7 +20,8 @@
 
 -export([ensure_mnesia_running/0, 
          create_table/1, clear_table/1,
-         get_tables_name/1]).
+         get_tables_name/1,
+		 delete_old_tables/2]).
 %%
 %% API Functions
 %%
@@ -63,6 +64,31 @@ get_tables_name(SessionId)->
     {{Y,M,D},_}=erlang:universaltime(),
     [list_to_atom(lists:concat([SessionId,"_in_",Y,"_",M,"_",D])),
     list_to_atom(lists:concat([SessionId,"_out_",Y,"_",M,"_",D]))].
+
+delete_old_tables(SessionId, Days) ->
+	[Table || Table <- mnesia:system_info(tables), delete(Table, Table, SessionId, Days) /= ok].
+
+delete(Name, Table, SessionId, Days) when is_atom(Table)->
+	delete(Name, erlang:atom_to_list(Table), SessionId, Days);
+delete(Name, Table, SessionId, Days) when is_atom(SessionId)->
+	delete(Name, Table, erlang:atom_to_list(SessionId), Days);
+delete(Name, Table, SessionId, Days) ->
+	case string:tokens(Table, "_") of
+		[SessionId,_,Year,Month,Day] ->
+			A = calendar:date_to_gregorian_days(list_to_integer(Year), 
+												list_to_integer(Month),
+												list_to_integer(Day)),
+			{{Y,M,D},_} = calendar:universaltime() , 
+			B = calendar:date_to_gregorian_days(Y,M,D),
+			case (B - A) > Days of
+				true -> 
+					{atomic, ok} = mnesia:delete_table(Name),
+					Name;
+				_-> ok
+			end;
+		_ -> 
+			ok
+	end.
 
 tables_exist(TableName) ->
     try
