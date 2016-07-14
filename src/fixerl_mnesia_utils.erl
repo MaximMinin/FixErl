@@ -78,7 +78,7 @@ delete(Name, Table, SessionId, Days) ->
 			A = calendar:date_to_gregorian_days(list_to_integer(Year), 
 												list_to_integer(Month),
 												list_to_integer(Day)),
-			{{Y,M,D},_} = calendar:universaltime() , 
+			{{Y,M,D},_} = erlang:universaltime(), 
 			B = calendar:date_to_gregorian_days(Y,M,D),
 			case (B - A) > Days of
 				true -> 
