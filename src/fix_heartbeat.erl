@@ -21,18 +21,25 @@
 %%
 start_heartbeat(Sock, Pid, TimeoutSec) ->
     Parent = self(),
+    spawn_link(fun () -> heartbeater(Sock, TimeoutSec * 1000 div 2,
+                                     send_oct, -1,
+                                     fun () ->
+                                             catch fix_gateway:send_heartbeat(Pid),
+                                             continue
+                                     end,
+                                     erlang:monitor(process, Parent)) end),
     spawn_link(fun () -> heartbeater(Sock, TimeoutSec * 1000,
+                                     recv_oct, 0,
+                                     fun () ->
+                                             catch fix_gateway:send_testrequest(Pid),
+                                             continue
+                                     end,
+                                     erlang:monitor(process, Parent)) end),
+    spawn_link(fun () -> heartbeater(Sock, TimeoutSec * 1000 * 3,
                                      recv_oct, 1,
                                      fun () ->
                                              Parent ! timeout,
                                              stop
-                                     end,
-                                     erlang:monitor(process, Parent)) end),
-    spawn_link(fun () -> heartbeater(Sock, TimeoutSec * 1000 div 2,
-                                     send_oct, 0,
-                                     fun () ->
-                                             catch fix_gateway:send_testrequest(Pid),
-                                             continue
                                      end,
                                      erlang:monitor(process, Parent)) end),
     ok.
