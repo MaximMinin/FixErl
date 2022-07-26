@@ -1,6 +1,6 @@
 {application, fixerl,
  [
-  {description, ""},
+  {description, "fix engine"},
   {vsn, "2.2.0"},
   {registered, []},
   {applications, [
