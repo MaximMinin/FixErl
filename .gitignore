@@ -1,4 +1,5 @@
 log/*
+_build
 .eunit
 deps
 priv
@@ -9,6 +10,7 @@ rebar
 .project
 .settings
 .rebar
+rebar.lock
 rel/fixerl
 rel/files
 .gitignore
